@@ -20,7 +20,8 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     # Local apps
-    'users',
+    'apps.users',
+    'apps.catalog'
 ]
 
 MIDDLEWARE = [
@@ -76,6 +77,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
+# app_label stays 'users' because UsersConfig sets label = 'users'
 AUTH_USER_MODEL = 'users.User'
 
 # Custom Logging
