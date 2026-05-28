@@ -1,0 +1,139 @@
+import logging
+
+from rest_framework import status
+from rest_framework.views import APIView
+
+from config.api_response import error_response, success_response
+
+from apps.users.selectors import (
+    get_all_members,
+    get_member_by_id,
+    get_user_by_id,
+)
+from apps.users.serializers import (
+    MemberProfileInputSerializer,
+    MemberProfileOutputSerializer,
+    MemberProfileUpdateInputSerializer,
+)
+from apps.users.services import create_member_profile, update_member_profile, verify_member
+
+logger = logging.getLogger(__name__)
+
+
+class MemberListView(APIView):
+    """
+    GET  /api/v1/users/members/  — list all members
+    POST /api/v1/users/members/  — create a member profile for a user
+    """
+
+    def get(self, request):
+        verified_only = request.query_params.get("verified") == "true"
+        members = get_all_members(verified_only=verified_only)
+        return success_response(
+            data=MemberProfileOutputSerializer(members, many=True).data
+        )
+
+    def post(self, request):
+        # Expect user_id in the body to link the profile
+        user_id = request.data.get("user_id")
+        if not user_id:
+            return error_response(
+                message="user_id is required.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = get_user_by_id(user_id)
+        if not user:
+            return error_response(
+                message="User not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = MemberProfileInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                message="Validation failed.",
+                errors=serializer.errors,
+            )
+
+        data = serializer.validated_data
+        try:
+            profile = create_member_profile(
+                user=user,
+                member_type=data["member_type"],
+                identity_number=data["identity_number"],
+            )
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=status.HTTP_409_CONFLICT)
+
+        return success_response(
+            data=MemberProfileOutputSerializer(profile).data,
+            message="Member profile created successfully.",
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class MemberDetailView(APIView):
+    """
+    GET   /api/v1/users/members/{id}/  — retrieve member detail
+    PATCH /api/v1/users/members/{id}/  — update member
+    """
+
+    def _get_member_or_404(self, member_id):
+        member = get_member_by_id(member_id)
+        if not member:
+            return None, error_response(
+                message="Member profile not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        return member, None
+
+    def get(self, request, pk):
+        member, err = self._get_member_or_404(pk)
+        if err:
+            return err
+        return success_response(data=MemberProfileOutputSerializer(member).data)
+
+    def patch(self, request, pk):
+        member, err = self._get_member_or_404(pk)
+        if err:
+            return err
+
+        serializer = MemberProfileUpdateInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                message="Validation failed.",
+                errors=serializer.errors,
+            )
+
+        data = serializer.validated_data
+        member = update_member_profile(
+            profile=member,
+            member_type=data.get("member_type"),
+            member_level=data.get("member_level"),
+        )
+        return success_response(
+            data=MemberProfileOutputSerializer(member).data,
+            message="Member profile updated successfully.",
+        )
+
+
+class MemberVerifyView(APIView):
+    """
+    POST /api/v1/users/members/{id}/verify/
+    Verify a member (staff action).
+    """
+
+    def post(self, request, pk):
+        member = get_member_by_id(pk)
+        if not member:
+            return error_response(
+                message="Member profile not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        member = verify_member(profile=member)
+        return success_response(
+            data=MemberProfileOutputSerializer(member).data,
+            message="Member verified successfully.",
+        )

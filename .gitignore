@@ -160,5 +160,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# My Important Files
+# Development Files
 context_progress/
+test_api.sh
