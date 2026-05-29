@@ -1,9 +1,11 @@
 import logging
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.permissions import IsStaff
 
 from apps.catalog.selectors import (
     get_all_book_copies,
@@ -26,6 +28,11 @@ class BookCopyListView(APIView):
     GET  /api/v1/catalog/book-copies/  — list all book copies (supports ?book_id= ?library_id=)
     POST /api/v1/catalog/book-copies/  — create a new book copy
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def get(self, request):
         qs = get_all_book_copies()
@@ -87,6 +94,11 @@ class BookCopyDetailView(APIView):
     PATCH  /api/v1/catalog/book-copies/{id}/  — update copy condition/metadata
     DELETE /api/v1/catalog/book-copies/{id}/  — delete copy
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def _get_copy_or_404(self, copy_id):
         copy = get_book_copy_by_id(copy_id)

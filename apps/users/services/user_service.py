@@ -3,6 +3,8 @@ import logging
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
+from apps.users.services.auth_service import delete_from_supabase, register_to_supabase
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -10,22 +12,44 @@ User = get_user_model()
 
 def create_user(*, name: str, email: str, password: str, **extra_fields) -> User:
     """
-    Create and persist a new User.
-    Raises ValueError if the email is already taken.
+    Create a new User in both Supabase Auth and Django DB.
+
+    Flow:
+      1. Register in Supabase Auth → get UID (outside Django transaction).
+      2. Create User in Django DB (inside transaction.atomic).
+      3. If Django DB fails → rollback Supabase Auth manually via delete_from_supabase.
+
+    Raises ValueError if:
+      - Email already taken in Django DB.
+      - Supabase Auth registration fails.
     """
     email = email.strip().lower()
     if User.objects.filter(email=email).exists():
         raise ValueError(f"A user with email '{email}' already exists.")
 
-    with transaction.atomic():
-        user = User.objects.create_user(
-            email=email,
-            name=name.strip(),
-            password=password,
-            **extra_fields,
-        )
+    # Step 1 — Register in Supabase Auth first (outside transaction)
+    supabase_uid = register_to_supabase(email=email, password=password)
 
-    logger.info("user.created user_id=%s email=%s", user.pk, user.email)
+    # Step 2 — Persist to Django DB
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                email=email,
+                name=name.strip(),
+                password=password,
+                supabase_uid=supabase_uid,   # ← bridge for JWT auth
+                **extra_fields,
+            )
+    except Exception as exc:
+        # Step 3 — Rollback Supabase Auth if Django DB fails
+        logger.error(
+            "user.create_failed email=%s — rolling back Supabase Auth uid=%s",
+            email, supabase_uid,
+        )
+        delete_from_supabase(uid=supabase_uid)
+        raise exc
+
+    logger.info("user.created user_id=%s email=%s supabase_uid=%s", user.pk, user.email, supabase_uid)
     return user
 
 

@@ -61,7 +61,15 @@ class User(TimestampMixin, AbstractBaseUser, PermissionsMixin):
         null=True,
         blank=True,
         db_index=True,
-        help_text="UID from the SSO provider (e.g. Supabase Auth).",
+        help_text="UID from the campus SSO provider (future integration).",
+    )
+    supabase_uid = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="UID from Supabase Auth. Used as the JWT bridge for authentication.",
     )
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True, db_index=True)

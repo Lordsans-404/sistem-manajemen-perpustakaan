@@ -1,11 +1,12 @@
 import logging
 
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
 
-from apps.users.selectors import get_all_users, get_user_by_id
+from apps.users.selectors import get_user_by_id
 from apps.users.serializers import (
     UserOutputSerializer,
     UserRegisterInputSerializer,
@@ -21,6 +22,9 @@ class UserRegisterView(APIView):
     POST /api/v1/users/register/
     Register a new user account.
     """
+
+    authentication_classes = []   # skip JWT auth — user doesn't have a token yet
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = UserRegisterInputSerializer(data=request.data)
@@ -54,6 +58,8 @@ class UserMeView(APIView):
     GET  /api/v1/users/me/   — retrieve own profile
     PATCH /api/v1/users/me/  — update own profile
     """
+
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = get_user_by_id(request.user.pk)

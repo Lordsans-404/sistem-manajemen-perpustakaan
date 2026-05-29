@@ -3,6 +3,15 @@ from decouple import config
 import logging.config
 import os
 
+# ---------------------------------------------------------------------------
+# Supabase
+# ---------------------------------------------------------------------------
+
+SUPABASE_URL = config("SUPABASE_URL")
+SUPABASE_PROJECT_REF = config("SUPABASE_PROJECT_REF")
+SUPABASE_ANON_KEY = config("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = config("SUPABASE_SERVICE_ROLE_KEY")
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Auto-create logs directory
@@ -113,4 +122,19 @@ LOGGING = {
             'propagate': False,
         },
     },
+}
+
+# ---------------------------------------------------------------------------
+# Django REST Framework
+# ---------------------------------------------------------------------------
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "config.authentication.SupabaseJWTAuthentication",
+    ],
+    # Default: all endpoints require authentication.
+    # Public endpoints (register, login) override this with AllowAny.
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
 }

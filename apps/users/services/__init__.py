@@ -1,3 +1,4 @@
+from apps.users.services.auth_service import login_with_supabase
 from apps.users.services.user_service import (
     create_user,
     deactivate_user,
@@ -19,6 +20,8 @@ from apps.users.services.staff_service import (
 )
 
 __all__ = [
+    # auth
+    "login_with_supabase",
     # user
     "create_user",
     "update_user",

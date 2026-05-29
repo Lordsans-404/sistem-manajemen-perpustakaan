@@ -3,6 +3,7 @@ from django.urls import path
 from apps.users.views import (
     LibraryDetailView,
     LibraryListView,
+    LoginView,
     MemberDetailView,
     MemberListView,
     MemberVerifyView,
@@ -15,6 +16,9 @@ from apps.users.views import (
 app_name = "users"
 
 urlpatterns = [
+    # --- Auth ---
+    path("login/", LoginView.as_view(), name="user-login"),
+
     # --- User ---
     path("register/", UserRegisterView.as_view(), name="user-register"),
     path("me/", UserMeView.as_view(), name="user-me"),

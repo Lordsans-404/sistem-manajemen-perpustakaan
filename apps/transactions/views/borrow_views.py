@@ -1,9 +1,11 @@
 import logging
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.permissions import IsMember, IsStaff
 
 from apps.catalog.selectors import get_book_copy_by_id
 from apps.transactions.selectors import (
@@ -31,6 +33,11 @@ class BorrowListView(APIView):
            ?status=overdue   → overdue only
     POST /api/v1/transactions/borrows/   — create a new borrow (borrow a book)
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsMember()]
 
     def get(self, request):
         status_param = request.query_params.get("status")
@@ -104,6 +111,8 @@ class BorrowDetailView(APIView):
     GET  /api/v1/transactions/borrows/{id}/  — retrieve borrow detail
     """
 
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, pk):
         borrow = get_borrow_by_id(pk)
         if not borrow:
@@ -120,6 +129,8 @@ class BorrowReturnView(APIView):
     Mark a borrowed book as returned.
     Auto-creates an overdue fine if the book is returned late.
     """
+
+    permission_classes = [IsStaff]
 
     def post(self, request, pk):
         borrow = get_borrow_by_id(pk)

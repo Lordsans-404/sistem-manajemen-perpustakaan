@@ -1,9 +1,11 @@
 import logging
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.permissions import IsAdmin, IsStaff
 
 from apps.transactions.selectors import get_all_fines, get_borrow_by_id, get_fine_by_id
 from apps.transactions.serializers import (
@@ -22,6 +24,11 @@ class FineListView(APIView):
          Supports ?payment_status=unpaid|paid|waived
     POST /api/v1/transactions/fines/   — create a manual fine (staff: damage/loss/other)
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def get(self, request):
         payment_status = request.query_params.get("payment_status")
@@ -69,6 +76,8 @@ class FineDetailView(APIView):
     GET /api/v1/transactions/fines/{id}/  — retrieve fine detail
     """
 
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, pk):
         fine = get_fine_by_id(pk)
         if not fine:
@@ -84,6 +93,8 @@ class FinePayView(APIView):
     PATCH /api/v1/transactions/fines/{id}/pay/
     Mark a fine as paid. Requires paid_date in the request body.
     """
+
+    permission_classes = [IsStaff]
 
     def patch(self, request, pk):
         fine = get_fine_by_id(pk)
@@ -119,6 +130,8 @@ class FineWaiveView(APIView):
     PATCH /api/v1/transactions/fines/{id}/waive/
     Waive a fine (staff/supervisor discretion).
     """
+
+    permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
         fine = get_fine_by_id(pk)

@@ -1,9 +1,11 @@
 import logging
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.permissions import IsStaff
 
 from apps.users.selectors import (
     get_all_libraries,
@@ -23,6 +25,11 @@ class LibraryListView(APIView):
     GET  /api/v1/users/libraries/  — list all libraries
     POST /api/v1/users/libraries/  — create a new library
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def get(self, request):
         libraries = get_all_libraries()
@@ -61,6 +68,11 @@ class LibraryDetailView(APIView):
     PATCH  /api/v1/users/libraries/{id}/  — update library
     DELETE /api/v1/users/libraries/{id}/  — delete library
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def _get_library_or_404(self, library_id):
         library = get_library_by_id(library_id)

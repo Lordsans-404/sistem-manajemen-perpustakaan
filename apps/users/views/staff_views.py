@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.permissions import IsAdmin, IsStaff
 
 from apps.users.selectors import (
     get_all_staff,
@@ -26,6 +27,11 @@ class StaffListView(APIView):
     GET  /api/v1/users/staff/  — list all staff
     POST /api/v1/users/staff/  — create a staff profile for a user
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsStaff()]
+        return [IsAdmin()]
 
     def get(self, request):
         staff = get_all_staff()
@@ -85,6 +91,11 @@ class StaffDetailView(APIView):
     GET   /api/v1/users/staff/{id}/  — retrieve staff detail
     PATCH /api/v1/users/staff/{id}/  — update staff (library/role)
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsStaff()]
+        return [IsAdmin()]
 
     def _get_staff_or_404(self, staff_id):
         staff = get_staff_by_id(staff_id)

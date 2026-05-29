@@ -1,9 +1,11 @@
 import logging
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.permissions import IsStaff
 
 from apps.users.selectors import (
     get_all_members,
@@ -25,6 +27,11 @@ class MemberListView(APIView):
     GET  /api/v1/users/members/  — list all members
     POST /api/v1/users/members/  — create a member profile for a user
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def get(self, request):
         verified_only = request.query_params.get("verified") == "true"
@@ -79,6 +86,11 @@ class MemberDetailView(APIView):
     PATCH /api/v1/users/members/{id}/  — update member
     """
 
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
+
     def _get_member_or_404(self, member_id):
         member = get_member_by_id(member_id)
         if not member:
@@ -123,6 +135,8 @@ class MemberVerifyView(APIView):
     POST /api/v1/users/members/{id}/verify/
     Verify a member (staff action).
     """
+
+    permission_classes = [IsStaff]
 
     def post(self, request, pk):
         member = get_member_by_id(pk)

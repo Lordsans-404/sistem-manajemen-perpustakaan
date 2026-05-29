@@ -1,9 +1,11 @@
 import logging
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.permissions import IsStaff
 
 from apps.catalog.selectors import get_all_books, get_book_by_id, search_books
 from apps.catalog.serializers import (
@@ -21,6 +23,11 @@ class BookListView(APIView):
     GET  /api/v1/catalog/books/           — list all books (supports ?search=)
     POST /api/v1/catalog/books/           — create a new book
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def get(self, request):
         query = request.query_params.get("search", "").strip()
@@ -56,6 +63,11 @@ class BookDetailView(APIView):
     PATCH  /api/v1/catalog/books/{id}/  — update book
     DELETE /api/v1/catalog/books/{id}/  — delete book
     """
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        return [IsStaff()]
 
     def _get_book_or_404(self, book_id):
         book = get_book_by_id(book_id)
