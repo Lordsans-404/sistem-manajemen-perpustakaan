@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.pagination import StandardPagination
 from config.permissions import IsStaff
 
 from apps.catalog.selectors import (
@@ -45,8 +46,10 @@ class BookCopyListView(APIView):
         if library_id:
             qs = qs.filter(library_id=library_id)
 
-        return success_response(
-            data=BookCopyOutputSerializer(qs, many=True).data
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(
+            BookCopyOutputSerializer(page, many=True).data
         )
 
     def post(self, request):

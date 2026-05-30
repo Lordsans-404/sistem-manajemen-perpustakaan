@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.pagination import StandardPagination
 from config.permissions import IsStaff
 
 from apps.users.selectors import (
@@ -33,8 +34,10 @@ class LibraryListView(APIView):
 
     def get(self, request):
         libraries = get_all_libraries()
-        return success_response(
-            data=LibraryOutputSerializer(libraries, many=True).data
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(libraries, request)
+        return paginator.get_paginated_response(
+            LibraryOutputSerializer(page, many=True).data
         )
 
     def post(self, request):

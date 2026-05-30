@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.pagination import StandardPagination
 from config.permissions import IsAdmin, IsStaff
 
 from apps.users.selectors import (
@@ -35,8 +36,10 @@ class StaffListView(APIView):
 
     def get(self, request):
         staff = get_all_staff()
-        return success_response(
-            data=StaffProfileOutputSerializer(staff, many=True).data
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(staff, request)
+        return paginator.get_paginated_response(
+            StaffProfileOutputSerializer(page, many=True).data
         )
 
     def post(self, request):

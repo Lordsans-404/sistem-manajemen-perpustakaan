@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.pagination import StandardPagination
 from config.permissions import IsStaff
 
 from apps.users.selectors import (
@@ -36,8 +37,10 @@ class MemberListView(APIView):
     def get(self, request):
         verified_only = request.query_params.get("verified") == "true"
         members = get_all_members(verified_only=verified_only)
-        return success_response(
-            data=MemberProfileOutputSerializer(members, many=True).data
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(members, request)
+        return paginator.get_paginated_response(
+            MemberProfileOutputSerializer(page, many=True).data
         )
 
     def post(self, request):

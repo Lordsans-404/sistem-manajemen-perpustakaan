@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.pagination import StandardPagination
 from config.permissions import IsStaff
 
 from apps.catalog.selectors import get_all_books, get_book_by_id, search_books
@@ -32,8 +33,10 @@ class BookListView(APIView):
     def get(self, request):
         query = request.query_params.get("search", "").strip()
         books = search_books(query) if query else get_all_books()
-        return success_response(
-            data=BookOutputSerializer(books, many=True).data
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(books, request)
+        return paginator.get_paginated_response(
+            BookOutputSerializer(page, many=True).data
         )
 
     def post(self, request):

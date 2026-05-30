@@ -47,7 +47,7 @@ def create_user(*, name: str, email: str, password: str, **extra_fields) -> User
             email, supabase_uid,
         )
         delete_from_supabase(uid=supabase_uid)
-        raise exc
+        raise
 
     logger.info("user.created user_id=%s email=%s supabase_uid=%s", user.pk, user.email, supabase_uid)
     return user
