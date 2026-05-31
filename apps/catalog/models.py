@@ -17,6 +17,7 @@ class Book(TimestampMixin):
     title = models.CharField(max_length=500, db_index=True)
     author = models.CharField(max_length=255, db_index=True)
     category = models.CharField(max_length=100, db_index=True)
+    cover_image = models.URLField(blank=True, null=True)
 
     class Meta:
         db_table = "books"
@@ -49,7 +50,7 @@ class BookCopy(TimestampMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     book = models.ForeignKey(
         Book,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="copies",
     )
     library = models.ForeignKey(

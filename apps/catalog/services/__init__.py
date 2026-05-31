@@ -8,6 +8,7 @@ from apps.catalog.services.book_copy_service import (
     delete_book_copy,
     update_book_copy,
 )
+from apps.catalog.services.storage_service import delete_cover_image, upload_cover_image
 
 __all__ = [
     # book
@@ -18,4 +19,7 @@ __all__ = [
     "create_book_copy",
     "update_book_copy",
     "delete_book_copy",
+    # storage
+    "upload_cover_image",
+    "delete_cover_image",
 ]

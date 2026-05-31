@@ -163,3 +163,4 @@ Thumbs.db
 # Development Files
 context_progress/
 test_api.sh
+test_assets/

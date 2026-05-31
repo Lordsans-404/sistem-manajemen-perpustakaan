@@ -1,7 +1,5 @@
 import logging
 
-from django.db import transaction
-
 from apps.catalog.models import Book
 
 logger = logging.getLogger(__name__)
@@ -9,37 +7,30 @@ logger = logging.getLogger(__name__)
 
 def create_book(*, title: str, author: str, category: str) -> Book:
     """Create and persist a new Book record."""
-    with transaction.atomic():
-        book = Book.objects.create(
-            title=title.strip(),
-            author=author.strip(),
-            category=category.strip(),
-        )
+    book = Book.objects.create(
+        title=title.strip(),
+        author=author.strip(),
+        category=category.strip(),
+    )
     logger.info("book.created book_id=%s title=%r", book.pk, book.title)
     return book
 
 
-def update_book(
-    *,
-    book: Book,
-    title: str | None = None,
-    author: str | None = None,
-    category: str | None = None,
-) -> Book:
-    """Partially update a Book. Only provided (non-None) fields are changed."""
+def update_book(*, book, title=None, author=None, category=None, cover_image=None):
     updated_fields = []
 
     if title is not None:
         book.title = title.strip()
         updated_fields.append("title")
-
     if author is not None:
         book.author = author.strip()
         updated_fields.append("author")
-
     if category is not None:
         book.category = category.strip()
         updated_fields.append("category")
+    if cover_image is not None:
+        book.cover_image = cover_image
+        updated_fields.append("cover_image")
 
     if updated_fields:
         book.save(update_fields=updated_fields + ["updated_at"])

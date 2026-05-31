@@ -5,8 +5,13 @@ Unit tests for:
   - book_service     : create_book, update_book, delete_book
   - book_copy_service: create_book_copy, update_book_copy, delete_book_copy
 """
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
+
+from django.db.models import ProtectedError
+
+from io import BytesIO
 
 from apps.catalog.models import Book, BookCopy
 from apps.catalog.services import (
@@ -16,6 +21,8 @@ from apps.catalog.services import (
     delete_book_copy,
     update_book,
     update_book_copy,
+    upload_cover_image,
+    delete_cover_image,
 )
 from apps.users.models import Library
 
@@ -104,14 +111,22 @@ class DeleteBookServiceTest(TestCase):
         delete_book(book=book)
         self.assertFalse(Book.objects.filter(pk=pk).exists())
 
-    def test_delete_book_cascades_to_copies(self):
-        """Deleting a book should remove all its copies (CASCADE)."""
+
+    def test_delete_book_without_copies_success(self):
+        """Book dengan tidak ada copies bisa dihapus."""
         book = make_book()
-        library = make_library()
-        copy = BookCopy.objects.create(book=book, library=library)
-        copy_pk = copy.pk
+        pk = book.pk
         delete_book(book=book)
-        self.assertFalse(BookCopy.objects.filter(pk=copy_pk).exists())
+        self.assertFalse(Book.objects.filter(pk=pk).exists())
+
+    def test_delete_book_with_copies_raises_protected_error(self):
+        """Book yang masih punya copies tidak bisa dihapus — on_delete=PROTECT."""
+        book = make_book()
+        library = make_library(code="LIB-PROT")
+        BookCopy.objects.create(book=book, library=library)
+
+        with self.assertRaises(ProtectedError):
+            delete_book(book=book)
 
 
 # ===========================================================================
@@ -202,3 +217,93 @@ class DeleteBookCopyServiceTest(TestCase):
         pk = self.copy.pk
         delete_book_copy(copy=self.copy)
         self.assertFalse(BookCopy.objects.filter(pk=pk).exists())
+
+# ===========================================================================
+# test upload_cover_image
+# ===========================================================================
+
+    @patch("apps.catalog.services.storage_service._get_supabase_client")
+    def test_upload_returns_public_url(self, mock_get_client):
+        """upload_cover_image() return URL yang benar."""
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        fake_file = BytesIO(b"fake image content")
+        fake_file.content_type = "image/jpeg"
+
+        url = upload_cover_image(file=fake_file, filename="cover.jpg")
+
+        # Pastikan upload dipanggil
+        mock_client.storage.from_().upload.assert_called_once()
+
+        # Pastikan URL mengandung bucket name dan ekstensi
+        self.assertIn("library-storage", url)
+        self.assertIn(".jpg", url)
+
+    @patch("apps.catalog.services.storage_service._get_supabase_client")
+    def test_upload_generates_unique_filename(self, mock_get_client):
+        """Setiap upload punya filename unik — tidak collision."""
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        fake_file1 = BytesIO(b"image 1")
+        fake_file1.content_type = "image/jpeg"
+        fake_file2 = BytesIO(b"image 2")
+        fake_file2.content_type = "image/jpeg"
+
+        url1 = upload_cover_image(file=fake_file1, filename="cover.jpg")
+        url2 = upload_cover_image(file=fake_file2, filename="cover.jpg")
+
+        self.assertNotEqual(url1, url2)  # UUID berbeda tiap upload
+
+# ===========================================================================
+# delete_cover_image
+# ===========================================================================
+
+class DeleteCoverImageTest(TestCase):
+
+    @patch("apps.catalog.services.storage_service._get_supabase_client")
+    def test_delete_calls_supabase_remove(self, mock_get_client):
+        """delete_cover_image() memanggil Supabase remove dengan path yang benar."""
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        url = "https://xxx.supabase.co/storage/v1/object/public/library-storage/covers/abc123.jpg"
+        delete_cover_image(url)
+
+        mock_client.storage.from_().remove.assert_called_once_with(["covers/abc123.jpg"])
+
+    @patch("apps.catalog.services.storage_service._get_supabase_client")
+    def test_delete_none_url_does_nothing(self, mock_get_client):
+        """delete_cover_image(None) tidak crash dan tidak memanggil Supabase."""
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        delete_cover_image(None)  # tidak boleh raise
+
+        mock_client.storage.from_().remove.assert_not_called()
+
+    @patch("apps.catalog.services.storage_service._get_supabase_client")
+    def test_delete_empty_url_does_nothing(self, mock_get_client):
+        """delete_cover_image('') tidak crash."""
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        delete_cover_image("")
+
+        mock_client.storage.from_().remove.assert_not_called()
+
+    @patch("apps.catalog.services.storage_service._get_supabase_client")
+    def test_delete_supabase_error_does_not_raise(self, mock_get_client):
+        """Kalau Supabase error saat delete, tidak propagate ke caller."""
+        mock_client = MagicMock()
+        mock_client.storage.from_().remove.side_effect = Exception("Supabase down")
+        mock_get_client.return_value = mock_client
+
+        url = "https://xxx.supabase.co/storage/v1/object/public/library-storage/covers/abc.jpg"
+
+        # Tidak boleh raise — storage service sudah handle dengan logger.warning
+        try:
+            delete_cover_image(url)
+        except Exception:
+            self.fail("delete_cover_image() raised Exception unexpectedly!")

@@ -1,5 +1,7 @@
 import logging
 
+from django.db.models import ProtectedError
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -14,7 +16,7 @@ from apps.catalog.serializers import (
     BookOutputSerializer,
     BookUpdateInputSerializer,
 )
-from apps.catalog.services import create_book, delete_book, update_book
+from apps.catalog.services import create_book, delete_book, update_book, upload_cover_image, delete_cover_image
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +102,24 @@ class BookDetailView(APIView):
             )
 
         data = serializer.validated_data
+
+        # Handle cover image upload
+        cover_url = None
+        cover_file = request.FILES.get("cover_image")
+        if cover_file:
+            if book.cover_image:
+                delete_cover_image(book.cover_image)  # hapus lama
+            cover_url = upload_cover_image(
+                file=cover_file,
+                filename=cover_file.name,
+            )
+
         book = update_book(
             book=book,
             title=data.get("title"),
             author=data.get("author"),
             category=data.get("category"),
+            cover_image=cover_url,  # ✅
         )
         return success_response(
             data=BookOutputSerializer(book).data,
@@ -118,7 +133,7 @@ class BookDetailView(APIView):
 
         try:
             delete_book(book=book)
-        except Exception:
+        except ProtectedError:
             return error_response(
                 message="Cannot delete book. It may still have book copies.",
                 status_code=status.HTTP_409_CONFLICT,

@@ -18,12 +18,13 @@ Endpoints covered:
 """
 
 import uuid
+from datetime import date, timedelta
 
-from rest_framework import status
-from rest_framework.test import APIClient, APITestCase
+from rest_framework.test import APITestCase
 
 from apps.catalog.models import Book, BookCopy
-from apps.users.models import Library, StaffProfile, User
+from apps.transactions.models import BorrowTransaction
+from apps.users.models import Library, MemberProfile, StaffProfile, User
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +51,26 @@ def make_book():
 
 def make_book_copy(book, library, condition="good"):
     return BookCopy.objects.create(book=book, library=library, condition=condition)
+
+
+def make_verified_member(user):
+    import uuid as _uuid
+    return MemberProfile.objects.create(
+        user=user,
+        member_type="student",
+        identity_number=f"STD-{_uuid.uuid4().hex[:6]}",
+        verified_at=date.today(),
+    )
+
+
+def make_borrow(member, book_copy, library, days_until_due=7):
+    return BorrowTransaction.objects.create(
+        member=member,
+        book_copy=book_copy,
+        library=library,
+        borrow_date=date.today(),
+        due_date=date.today() + timedelta(days=days_until_due),
+    )
 
 
 # ===========================================================================
@@ -108,6 +129,14 @@ class BookListViewTest(APITestCase):
         res = self.client.post(self.url, {"title": "Only Title"}, format="json")
         self.assertEqual(res.status_code, 400)
 
+    def test_post_book_unauthenticated_401(self):
+        res = self.client.post(self.url, {
+            "title": "New Book",
+            "author": "Author A",
+            "category": "Fiction",
+        }, format="json")
+        self.assertEqual(res.status_code, 401)
+
 
 # ===========================================================================
 # BookDetailView  GET/PATCH/DELETE /api/v1/catalog/books/{id}/
@@ -129,6 +158,10 @@ class BookDetailViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"]["title"], "Test Book")
 
+    def test_get_book_detail_unauthenticated_401(self):
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 401)
+
     def test_get_book_not_found_404(self):
         self.client.force_authenticate(user=self.plain_user)
         res = self.client.get(f"/api/v1/catalog/books/{uuid.uuid4()}/")
@@ -146,10 +179,20 @@ class BookDetailViewTest(APITestCase):
         self.assertEqual(res.status_code, 403)
 
     def test_delete_book_as_staff_204(self):
+        """Book with no copies can be deleted successfully."""
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.delete(self.url)
         self.assertEqual(res.status_code, 204)
         self.assertFalse(Book.objects.filter(pk=self.book.pk).exists())
+
+    def test_delete_book_with_copies_409(self):
+        """Cannot delete book that still has copies — on_delete=PROTECT."""
+        make_book_copy(self.book, self.library)
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.delete(self.url)
+        self.assertEqual(res.status_code, 409)
+        # Book masih ada di DB
+        self.assertTrue(Book.objects.filter(pk=self.book.pk).exists())
 
     def test_delete_book_as_plain_user_403(self):
         self.client.force_authenticate(user=self.plain_user)
@@ -181,6 +224,17 @@ class BookCopyListViewTest(APITestCase):
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 401)
 
+    def test_get_book_copies_filter_by_book_id(self):
+        """?book_id= filter returns only copies of that book."""
+        other_book = Book.objects.create(title="Other Book", author="B", category="X")
+        make_book_copy(self.book, self.library)
+        make_book_copy(other_book, self.library)
+        self.client.force_authenticate(user=self.plain_user)
+        res = self.client.get(self.url + f"?book_id={self.book.pk}")
+        self.assertEqual(res.status_code, 200)
+        for item in res.data["data"]["results"]:
+            self.assertEqual(item["book"]["id"], str(self.book.pk))
+
     def test_post_book_copy_as_staff_201(self):
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.post(self.url, {
@@ -198,6 +252,14 @@ class BookCopyListViewTest(APITestCase):
             "library_id": str(self.library.pk),
         }, format="json")
         self.assertEqual(res.status_code, 403)
+
+    def test_post_book_copy_unauthenticated_401(self):
+        res = self.client.post(self.url, {
+            "book_id": str(self.book.pk),
+            "library_id": str(self.library.pk),
+            "condition": "new",
+        }, format="json")
+        self.assertEqual(res.status_code, 401)
 
 
 # ===========================================================================
@@ -221,6 +283,10 @@ class BookCopyDetailViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"]["condition"], "good")
 
+    def test_get_book_copy_detail_unauthenticated_401(self):
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 401)
+
     def test_get_book_copy_not_found_404(self):
         self.client.force_authenticate(user=self.plain_user)
         res = self.client.get(f"/api/v1/catalog/book-copies/{uuid.uuid4()}/")
@@ -238,10 +304,22 @@ class BookCopyDetailViewTest(APITestCase):
         self.assertEqual(res.status_code, 403)
 
     def test_delete_book_copy_as_staff_204(self):
+        """Copy with no active borrows can be deleted."""
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.delete(self.url)
         self.assertEqual(res.status_code, 204)
         self.assertFalse(BookCopy.objects.filter(pk=self.copy.pk).exists())
+
+    def test_delete_book_copy_with_active_borrow_409(self):
+        """Cannot delete copy that has an active borrow transaction."""
+        member_user = make_user(email="member_del@test.com")
+        member = make_verified_member(member_user)
+        make_borrow(member, self.copy, self.library)
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.delete(self.url)
+        self.assertEqual(res.status_code, 409)
+        # Copy masih ada di DB
+        self.assertTrue(BookCopy.objects.filter(pk=self.copy.pk).exists())
 
     def test_delete_book_copy_as_plain_user_403(self):
         self.client.force_authenticate(user=self.plain_user)

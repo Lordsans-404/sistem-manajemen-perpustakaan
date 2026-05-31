@@ -23,11 +23,9 @@ class BookUpdateInputSerializer(serializers.Serializer):
     author = serializers.CharField(max_length=255, required=False)
     category = serializers.CharField(max_length=100, required=False)
 
-
 # ---------------------------------------------------------------------------
 # Book — Output
 # ---------------------------------------------------------------------------
-
 
 class BookOutputSerializer(serializers.ModelSerializer):
     """Read-only representation of a Book title."""
@@ -39,6 +37,7 @@ class BookOutputSerializer(serializers.ModelSerializer):
             "title",
             "author",
             "category",
+            "cover_image",
             "created_at",
             "updated_at",
         ]
