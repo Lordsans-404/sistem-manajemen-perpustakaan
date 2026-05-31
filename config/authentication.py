@@ -1,3 +1,4 @@
+from functools import lru_cache
 import logging
 
 import jwt
@@ -9,15 +10,18 @@ from rest_framework.exceptions import AuthenticationFailed
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# JWKS Client — fetches & caches Supabase's public keys automatically
-# PyJWKClient handles caching internally; we instantiate once at module level
-# so the cache persists across requests within the same process.
+# JWKS Client — lazy-initialized to avoid network calls at import time.
+# This is important for test environments where no real Supabase connection
+# is available. The client is created on first use via _get_jwks_client().
 # ---------------------------------------------------------------------------
 
-_SUPABASE_PROJECT_REF = config("SUPABASE_PROJECT_REF")
-_JWKS_URL = f"https://{_SUPABASE_PROJECT_REF}.supabase.co/auth/v1/.well-known/jwks.json"
 
-_jwks_client = PyJWKClient(_JWKS_URL, cache_keys=True)
+
+@lru_cache(maxsize=1)
+def _get_jwks_client() -> PyJWKClient:
+    project_ref = config("SUPABASE_PROJECT_REF")
+    jwks_url = f"https://{project_ref}.supabase.co/auth/v1/.well-known/jwks.json"
+    return PyJWKClient(jwks_url, cache_keys=True)
 
 
 class SupabaseJWTAuthentication(BaseAuthentication):
@@ -43,6 +47,12 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         user = self._get_user(payload)
         return (user, payload)
 
+    def authenticate_header(self, request):
+        """
+        Required by DRF to return 401 instead of 403 for unauthenticated requests.
+        """
+        return "Bearer"
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
@@ -61,7 +71,7 @@ class SupabaseJWTAuthentication(BaseAuthentication):
         Raises AuthenticationFailed on any validation error.
         """
         try:
-            signing_key = _jwks_client.get_signing_key_from_jwt(token)
+            signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
             payload = jwt.decode(
                 token,
                 key=signing_key.key,

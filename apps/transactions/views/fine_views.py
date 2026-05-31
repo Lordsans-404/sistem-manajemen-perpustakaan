@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.pagination import StandardPagination
 from config.permissions import IsAdmin, IsStaff
 
 from apps.transactions.selectors import get_all_fines, get_borrow_by_id, get_fine_by_id
@@ -33,8 +34,10 @@ class FineListView(APIView):
     def get(self, request):
         payment_status = request.query_params.get("payment_status")
         fines = get_all_fines(payment_status=payment_status)
-        return success_response(
-            data=FineOutputSerializer(fines, many=True).data
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(fines, request)
+        return paginator.get_paginated_response(
+            FineOutputSerializer(page, many=True).data
         )
 
     def post(self, request):

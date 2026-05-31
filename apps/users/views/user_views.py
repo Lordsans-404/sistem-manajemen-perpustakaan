@@ -62,10 +62,7 @@ class UserMeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = get_user_by_id(request.user.pk)
-        if not user:
-            return error_response(message="User not found.", status_code=status.HTTP_404_NOT_FOUND)
-        return success_response(data=UserOutputSerializer(user).data)
+        return success_response(data=UserOutputSerializer(request.user).data)
 
     def patch(self, request):
         serializer = UserUpdateInputSerializer(data=request.data)

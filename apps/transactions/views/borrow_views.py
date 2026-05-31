@@ -5,12 +5,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from config.pagination import StandardPagination
 from config.permissions import IsMember, IsStaff
 
 from apps.catalog.selectors import get_book_copy_by_id
 from apps.transactions.selectors import (
     get_all_borrows,
     get_borrow_by_id,
+    get_overdue_borrows,
 )
 from apps.transactions.serializers import (
     BorrowTransactionInputSerializer,
@@ -43,7 +45,6 @@ class BorrowListView(APIView):
         status_param = request.query_params.get("status")
 
         if status_param == "overdue":
-            from apps.transactions.selectors import get_overdue_borrows
             borrows = get_overdue_borrows()
         elif status_param == "active":
             borrows = get_all_borrows(returned=False)
@@ -52,8 +53,10 @@ class BorrowListView(APIView):
         else:
             borrows = get_all_borrows()
 
-        return success_response(
-            data=BorrowTransactionListOutputSerializer(borrows, many=True).data
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(borrows, request)
+        return paginator.get_paginated_response(
+            BorrowTransactionListOutputSerializer(page, many=True).data
         )
 
     def post(self, request):

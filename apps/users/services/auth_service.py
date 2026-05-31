@@ -7,10 +7,16 @@ logger = logging.getLogger(__name__)
 
 # Supabase client — uses service role key so it can manage Auth users
 # (anon key cannot create/delete auth users server-side)
-_supabase = create_client(
-    config("SUPABASE_URL"),
-    config("SUPABASE_SERVICE_ROLE_KEY"),
-)
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
+def _get_supabase():
+    """Lazy Supabase client — created only when first needed, not at import time."""
+    return create_client(
+        config("SUPABASE_URL"),
+        config("SUPABASE_SERVICE_ROLE_KEY"),
+    )
 
 
 def register_to_supabase(*, email: str, password: str) -> str:
@@ -20,7 +26,7 @@ def register_to_supabase(*, email: str, password: str) -> str:
     Raises ValueError if Supabase Auth rejects the registration.
     """
     try:
-        response = _supabase.auth.admin.create_user({
+        response = _get_supabase().auth.admin.create_user({
             "email": email,
             "password": password,
             "email_confirm": True,   # skip email confirmation for now
@@ -39,7 +45,7 @@ def delete_from_supabase(*, uid: str) -> None:
     Used as a rollback if Django DB creation fails after Supabase Auth succeeds.
     """
     try:
-        _supabase.auth.admin.delete_user(uid)
+        _get_supabase().auth.admin.delete_user(uid)
         logger.info("supabase_auth.deleted uid=%s", uid)
     except Exception as exc:
         logger.error(
@@ -55,7 +61,7 @@ def login_with_supabase(*, email: str, password: str) -> dict:
     Raises ValueError on invalid credentials.
     """
     try:
-        response = _supabase.auth.sign_in_with_password({
+        response = _get_supabase().auth.sign_in_with_password({
             "email": email,
             "password": password,
         })

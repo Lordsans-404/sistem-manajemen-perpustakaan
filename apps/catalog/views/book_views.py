@@ -116,7 +116,14 @@ class BookDetailView(APIView):
         if err:
             return err
 
-        delete_book(book=book)
+        try:
+            delete_book(book=book)
+        except Exception:
+            return error_response(
+                message="Cannot delete book. It may still have book copies.",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
         return success_response(
             message="Book deleted successfully.",
             status_code=status.HTTP_204_NO_CONTENT,
