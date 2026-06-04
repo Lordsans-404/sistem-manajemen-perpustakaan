@@ -92,14 +92,15 @@ class BookListViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("results", res.data["data"])
 
-    def test_get_books_unauthenticated_401(self):
+    def test_get_books_unauthenticated_200(self):
+        """Catalog is now public — unauthenticated users can browse books."""
         res = self.client.get(self.url)
-        self.assertEqual(res.status_code, 401)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("results", res.data["data"])
 
     def test_get_books_search_returns_filtered_results(self):
         Book.objects.create(title="Django REST Framework", author="Tom", category="Tech")
         Book.objects.create(title="Python Basics", author="Alice", category="Intro")
-        self.client.force_authenticate(user=self.plain_user)
         res = self.client.get(self.url + "?search=Django")
         self.assertEqual(res.status_code, 200)
         titles = [r["title"] for r in res.data["data"]["results"]]
@@ -130,6 +131,7 @@ class BookListViewTest(APITestCase):
         self.assertEqual(res.status_code, 400)
 
     def test_post_book_unauthenticated_401(self):
+        """POST still requires authentication (IsStaff)."""
         res = self.client.post(self.url, {
             "title": "New Book",
             "author": "Author A",
@@ -158,12 +160,13 @@ class BookDetailViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"]["title"], "Test Book")
 
-    def test_get_book_detail_unauthenticated_401(self):
+    def test_get_book_detail_unauthenticated_200(self):
+        """Book detail is now public — no login needed."""
         res = self.client.get(self.url)
-        self.assertEqual(res.status_code, 401)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["data"]["title"], "Test Book")
 
     def test_get_book_not_found_404(self):
-        self.client.force_authenticate(user=self.plain_user)
         res = self.client.get(f"/api/v1/catalog/books/{uuid.uuid4()}/")
         self.assertEqual(res.status_code, 404)
 
@@ -191,7 +194,6 @@ class BookDetailViewTest(APITestCase):
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.delete(self.url)
         self.assertEqual(res.status_code, 409)
-        # Book masih ada di DB
         self.assertTrue(Book.objects.filter(pk=self.book.pk).exists())
 
     def test_delete_book_as_plain_user_403(self):
@@ -220,16 +222,17 @@ class BookCopyListViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("results", res.data["data"])
 
-    def test_get_book_copies_unauthenticated_401(self):
+    def test_get_book_copies_unauthenticated_200(self):
+        """Book copy list is now public — no login needed."""
         res = self.client.get(self.url)
-        self.assertEqual(res.status_code, 401)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("results", res.data["data"])
 
     def test_get_book_copies_filter_by_book_id(self):
         """?book_id= filter returns only copies of that book."""
         other_book = Book.objects.create(title="Other Book", author="B", category="X")
         make_book_copy(self.book, self.library)
         make_book_copy(other_book, self.library)
-        self.client.force_authenticate(user=self.plain_user)
         res = self.client.get(self.url + f"?book_id={self.book.pk}")
         self.assertEqual(res.status_code, 200)
         for item in res.data["data"]["results"]:
@@ -254,6 +257,7 @@ class BookCopyListViewTest(APITestCase):
         self.assertEqual(res.status_code, 403)
 
     def test_post_book_copy_unauthenticated_401(self):
+        """POST still requires authentication (IsStaff)."""
         res = self.client.post(self.url, {
             "book_id": str(self.book.pk),
             "library_id": str(self.library.pk),
@@ -283,12 +287,13 @@ class BookCopyDetailViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"]["condition"], "good")
 
-    def test_get_book_copy_detail_unauthenticated_401(self):
+    def test_get_book_copy_detail_unauthenticated_200(self):
+        """Book copy detail is now public — no login needed."""
         res = self.client.get(self.url)
-        self.assertEqual(res.status_code, 401)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["data"]["condition"], "good")
 
     def test_get_book_copy_not_found_404(self):
-        self.client.force_authenticate(user=self.plain_user)
         res = self.client.get(f"/api/v1/catalog/book-copies/{uuid.uuid4()}/")
         self.assertEqual(res.status_code, 404)
 
@@ -318,7 +323,6 @@ class BookCopyDetailViewTest(APITestCase):
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.delete(self.url)
         self.assertEqual(res.status_code, 409)
-        # Copy masih ada di DB
         self.assertTrue(BookCopy.objects.filter(pk=self.copy.pk).exists())
 
     def test_delete_book_copy_as_plain_user_403(self):

@@ -131,9 +131,11 @@ class LibraryListViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("results", res.data["data"])
 
-    def test_get_list_unauthenticated_401(self):
+    def test_get_list_unauthenticated_200(self):
+        """Libraries are now public — frontend dropdowns work without login."""
         res = self.client.get(self.url)
-        self.assertEqual(res.status_code, 401)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("results", res.data["data"])
 
     def test_post_as_staff_201(self):
         self.client.force_authenticate(user=self.staff_user)
@@ -144,6 +146,11 @@ class LibraryListViewTest(APITestCase):
         self.client.force_authenticate(user=self.plain_user)
         res = self.client.post(self.url, {"name": "X", "type": "faculty", "code": "LIB-X"}, format="json")
         self.assertEqual(res.status_code, 403)
+
+    def test_post_as_unauthenticated_401(self):
+        """POST still requires authentication (IsStaff)."""
+        res = self.client.post(self.url, {"name": "X", "type": "faculty", "code": "LIB-UNAUTH"}, format="json")
+        self.assertEqual(res.status_code, 401)
 
     def test_post_duplicate_code_400(self):
         self.client.force_authenticate(user=self.staff_user)
@@ -167,7 +174,6 @@ class LibraryDetailViewTest(APITestCase):
 
     def test_get_not_found_404(self):
         import uuid
-        self.client.force_authenticate(user=self.plain_user)
         res = self.client.get(f"/api/v1/users/libraries/{uuid.uuid4()}/")
         self.assertEqual(res.status_code, 404)
 
@@ -193,14 +199,43 @@ class MemberListViewTest(APITestCase):
 
     def setUp(self):
         self.library = make_library(code="LIB-MEM")
-        self.plain_user = make_user(email="plain3@test.com")
+        # Staff
         self.staff_user = make_user(email="staff3@test.com")
         make_staff(self.staff_user, self.library, role="librarian")
+        # Member user (has member profile)
+        self.member_user = make_user(email="member3@test.com")
+        self.member = make_member(self.member_user, identity_number="STD-MEM-001", verified=True)
+        # Other member (different user)
+        self.other_user = make_user(email="other3@test.com")
+        self.other_member = make_member(self.other_user, identity_number="STD-MEM-002", verified=True)
+        # Plain user with no member profile
+        self.plain_user = make_user(email="plain3@test.com")
 
-    def test_get_list_200(self):
-        self.client.force_authenticate(user=self.plain_user)
+    def test_get_list_as_staff_returns_all_200(self):
+        """Staff can see all members."""
+        self.client.force_authenticate(user=self.staff_user)
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 200)
+        self.assertGreaterEqual(res.data["data"]["count"], 2)
+
+    def test_get_list_as_member_returns_own_only_200(self):
+        """Member sees only their own profile — count must be 1."""
+        self.client.force_authenticate(user=self.member_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        results = res.data["data"]["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["identity_number"], "STD-MEM-001")
+
+    def test_get_list_as_user_without_member_profile_403(self):
+        """Authenticated user with no member_profile gets 403."""
+        self.client.force_authenticate(user=self.plain_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 403)
+
+    def test_get_list_unauthenticated_401(self):
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 401)
 
     def test_post_as_staff_201(self):
         new_user = make_user(email="newmem@test.com")
@@ -221,6 +256,50 @@ class MemberListViewTest(APITestCase):
             "identity_number": "STD-DEN-001",
         }, format="json")
         self.assertEqual(res.status_code, 403)
+
+
+class MemberDetailViewTest(APITestCase):
+
+    def setUp(self):
+        self.library = make_library(code="LIB-MDET")
+        self.staff_user = make_user(email="staffmdet@test.com")
+        make_staff(self.staff_user, self.library, role="librarian")
+        # Owner
+        self.member_user = make_user(email="membermdet@test.com")
+        self.member = make_member(self.member_user, identity_number="STD-MDET-001", verified=True)
+        # Other member (different user)
+        self.other_user = make_user(email="othermdet@test.com")
+        self.other_member = make_member(self.other_user, identity_number="STD-MDET-002", verified=True)
+        self.url = f"/api/v1/users/members/{self.member.pk}/"
+
+    def test_get_own_detail_as_member_200(self):
+        """Member can view their own profile."""
+        self.client.force_authenticate(user=self.member_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["data"]["identity_number"], "STD-MDET-001")
+
+    def test_get_other_member_detail_as_member_403(self):
+        """Member cannot view another member's profile."""
+        self.client.force_authenticate(user=self.other_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 403)
+
+    def test_get_any_member_detail_as_staff_200(self):
+        """Staff can view any member's profile."""
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+
+    def test_get_unauthenticated_401(self):
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 401)
+
+    def test_get_not_found_404(self):
+        import uuid
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.get(f"/api/v1/users/members/{uuid.uuid4()}/")
+        self.assertEqual(res.status_code, 404)
 
 
 class MemberVerifyViewTest(APITestCase):

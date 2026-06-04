@@ -77,5 +77,14 @@ LOGGING = {
 # SupabaseJWTAuthentication adalah default (dari base.py).
 # Di integration test, kita pakai force_authenticate() → authentication
 # class tidak dieksekusi sama sekali, jadi ini tidak masalah.
-# Tidak perlu override REST_FRAMEWORK di sini.
+#
+# Throttling di-nonaktifkan di sini karena test runner memanggil endpoint
+# berulang kali dalam hitungan milidetik sehingga AnonRateThrottle (10/min)
+# akan mengembalikan 429 dan merusak assertion test.
 # ---------------------------------------------------------------------------
+
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,  # type: ignore[name-defined]  # noqa: F405 — inherited from base.py via *
+    "DEFAULT_THROTTLE_CLASSES": [],
+    "DEFAULT_THROTTLE_RATES": {},
+}

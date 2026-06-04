@@ -74,7 +74,7 @@ class LibraryDetailView(APIView):
 
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [AllowAny()]
         return [IsStaff()]
 
     def _get_library_or_404(self, library_id):

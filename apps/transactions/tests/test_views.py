@@ -109,6 +109,10 @@ class BorrowListViewTest(APITestCase):
         self.member_user = make_user(email="member@test.com")
         self.member = make_verified_member(self.member_user)
 
+        # Another verified member
+        self.other_user = make_user(email="other@test.com")
+        self.other_member = make_verified_member(self.other_user)
+
         # Staff
         self.staff_user = make_user(email="staff@test.com")
         make_staff(self.staff_user, self.library, role="librarian")
@@ -117,17 +121,58 @@ class BorrowListViewTest(APITestCase):
         self.unver_user = make_user(email="unver@test.com")
         self.unverified_member = make_unverified_member(self.unver_user)
 
-    def test_get_borrows_authenticated_200(self):
+    def test_get_borrows_as_staff_sees_all_200(self):
+        """Staff sees all borrow records."""
+        make_borrow(self.member, self.copy, self.library)
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 200)
         self.assertIn("results", res.data["data"])
 
+    def test_get_borrows_as_member_sees_own_only_200(self):
+        """Verified member only sees their own borrows."""
+        copy2 = make_book_copy(self.book, self.library)
+        make_borrow(self.member, self.copy, self.library)
+        make_borrow(self.other_member, copy2, self.library)
+        self.client.force_authenticate(user=self.member_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        results = res.data["data"]["results"]
+        # BorrowTransactionListOutputSerializer is flat — no nested member object.
+        # Verify ownership by checking member_name matches the expected member's user name.
+        for item in results:
+            self.assertEqual(item["member_name"], self.member.user.name)
+
+    def test_get_borrows_as_member_no_profile_403(self):
+        """Authenticated user with no member_profile gets 403."""
+        plain_user = make_user(email="noprofile@test.com")
+        self.client.force_authenticate(user=plain_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 403)
+
     def test_get_borrows_unauthenticated_401(self):
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 401)
 
-    def test_post_borrow_as_verified_member_201(self):
+    def test_get_borrows_status_filter_active_as_staff(self):
+        make_borrow(self.member, self.copy, self.library)
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.get(self.url + "?status=active")
+        self.assertEqual(res.status_code, 200)
+        for item in res.data["data"]["results"]:
+            self.assertIsNone(item["return_date"])
+
+    def test_get_borrows_status_filter_active_as_member(self):
+        """Member status filter scopes to own borrows only."""
+        make_borrow(self.member, self.copy, self.library)
+        self.client.force_authenticate(user=self.member_user)
+        res = self.client.get(self.url + "?status=active")
+        self.assertEqual(res.status_code, 200)
+        for item in res.data["data"]["results"]:
+            self.assertEqual(item["member_name"], self.member.user.name)
+            self.assertIsNone(item["return_date"])
+
+    def test_post_borrow_as_verified_member_for_self_201(self):
         self.client.force_authenticate(user=self.member_user)
         res = self.client.post(self.url, {
             "member_id": str(self.member.pk),
@@ -138,8 +183,19 @@ class BorrowListViewTest(APITestCase):
         self.assertEqual(res.status_code, 201)
         self.assertIsNone(res.data["data"]["return_date"])
 
+    def test_post_borrow_as_member_for_other_member_403(self):
+        """Member cannot borrow on behalf of a different member."""
+        self.client.force_authenticate(user=self.member_user)
+        res = self.client.post(self.url, {
+            "member_id": str(self.other_member.pk),   # <-- different member!
+            "book_copy_id": str(self.copy.pk),
+            "library_id": str(self.library.pk),
+            "due_date": str(date.today() + timedelta(days=7)),
+        }, format="json")
+        self.assertEqual(res.status_code, 403)
+
     def test_post_borrow_unverified_member_403(self):
-        """Unverified member is rejected at DRF permission layer (IsMember) → 403."""
+        """Unverified member cannot borrow — is_verified check inside post()."""
         self.client.force_authenticate(user=self.unver_user)
         res = self.client.post(self.url, {
             "member_id": str(self.unverified_member.pk),
@@ -148,6 +204,17 @@ class BorrowListViewTest(APITestCase):
             "due_date": str(date.today() + timedelta(days=7)),
         }, format="json")
         self.assertEqual(res.status_code, 403)
+
+    def test_post_borrow_as_staff_for_any_member_201(self):
+        """Staff can create a borrow for any member."""
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.post(self.url, {
+            "member_id": str(self.member.pk),
+            "book_copy_id": str(self.copy.pk),
+            "library_id": str(self.library.pk),
+            "due_date": str(date.today() + timedelta(days=7)),
+        }, format="json")
+        self.assertEqual(res.status_code, 201)
 
     def test_post_borrow_copy_already_on_loan_409(self):
         """Cannot borrow a copy that is already on loan."""
@@ -174,14 +241,6 @@ class BorrowListViewTest(APITestCase):
         }, format="json")
         self.assertEqual(res.status_code, 401)
 
-    def test_get_borrows_status_filter_active(self):
-        make_borrow(self.member, self.copy, self.library)
-        self.client.force_authenticate(user=self.staff_user)
-        res = self.client.get(self.url + "?status=active")
-        self.assertEqual(res.status_code, 200)
-        for item in res.data["data"]["results"]:
-            self.assertIsNone(item["return_date"])
-
 
 # ===========================================================================
 # BorrowDetailView  GET /api/v1/transactions/borrows/{id}/
@@ -193,18 +252,40 @@ class BorrowDetailViewTest(APITestCase):
         self.library = make_library(code="LIB-BD")
         self.book = make_book()
         self.copy = make_book_copy(self.book, self.library)
+
         self.member_user = make_user(email="membd@test.com")
         self.member = make_verified_member(self.member_user)
         self.borrow = make_borrow(self.member, self.copy, self.library)
         self.url = f"/api/v1/transactions/borrows/{self.borrow.pk}/"
 
-    def test_get_borrow_detail_authenticated_200(self):
+        # Other member (different user)
+        self.other_user = make_user(email="otherbd@test.com")
+        self.other_member = make_verified_member(self.other_user)
+
+        # Staff
+        self.staff_user = make_user(email="staffbd@test.com")
+        make_staff(self.staff_user, self.library, role="librarian")
+
+    def test_get_own_borrow_as_member_200(self):
+        """Member can view their own borrow detail."""
         self.client.force_authenticate(user=self.member_user)
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 200)
 
+    def test_get_other_borrow_as_member_403(self):
+        """Member cannot view another member's borrow."""
+        self.client.force_authenticate(user=self.other_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 403)
+
+    def test_get_any_borrow_as_staff_200(self):
+        """Staff can view any borrow detail."""
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+
     def test_get_borrow_detail_not_found_404(self):
-        self.client.force_authenticate(user=self.member_user)
+        self.client.force_authenticate(user=self.staff_user)
         res = self.client.get(f"/api/v1/transactions/borrows/{uuid.uuid4()}/")
         self.assertEqual(res.status_code, 404)
 
@@ -239,7 +320,6 @@ class BorrowReturnViewTest(APITestCase):
 
     def test_return_late_message_mentions_fine(self):
         """Late return → response message should mention overdue fine."""
-        # Backdate the due_date
         self.borrow.due_date = date.today() - timedelta(days=3)
         self.borrow.save()
         self.client.force_authenticate(user=self.staff_user)
@@ -282,27 +362,73 @@ class FineListViewTest(APITestCase):
         self.library = make_library(code="LIB-FL")
         self.book = make_book()
         self.copy = make_book_copy(self.book, self.library)
+
         self.member_user = make_user(email="memfl@test.com")
         self.member = make_verified_member(self.member_user)
         self.borrow = make_borrow(self.member, self.copy, self.library)
+        self.fine = make_fine(self.borrow)
+
+        # Other member with their own borrow+fine
+        self.other_user = make_user(email="otherfl@test.com")
+        self.other_member = make_verified_member(self.other_user)
+        other_copy = make_book_copy(self.book, self.library)
+        other_borrow = make_borrow(self.other_member, other_copy, self.library)
+        make_fine(other_borrow, amount="99000")
 
         self.staff_user = make_user(email="stafffl@test.com")
         make_staff(self.staff_user, self.library, role="librarian")
 
-    def test_get_fines_authenticated_200(self):
+    def test_get_fines_as_staff_sees_all_200(self):
+        """Staff sees all fines."""
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertGreaterEqual(res.data["data"]["count"], 2)
+
+    def test_get_fines_as_member_sees_own_only_200(self):
+        """Member sees only their own fines."""
         self.client.force_authenticate(user=self.member_user)
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 200)
-        self.assertIn("results", res.data["data"])
+        results = res.data["data"]["results"]
+        # FineOutputSerializer nests BorrowTransactionListOutputSerializer (flat).
+        # Verify all results belong to this member via member_name.
+        for item in results:
+            self.assertEqual(
+                item["borrow_transaction"]["member_name"],
+                self.member.user.name,
+            )
+
+    def test_get_fines_as_user_without_member_profile_403(self):
+        """Authenticated user with no member_profile gets 403."""
+        plain_user = make_user(email="noprofilefl@test.com")
+        self.client.force_authenticate(user=plain_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 403)
 
     def test_get_fines_unauthenticated_401(self):
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 401)
 
+    def test_get_fines_payment_status_filter_as_member(self):
+        """payment_status filter is scoped to member's own fines."""
+        self.client.force_authenticate(user=self.member_user)
+        res = self.client.get(self.url + "?payment_status=unpaid")
+        self.assertEqual(res.status_code, 200)
+        for item in res.data["data"]["results"]:
+            self.assertEqual(item["payment_status"], "unpaid")
+            self.assertEqual(
+                item["borrow_transaction"]["member_name"],
+                self.member.user.name,
+            )
+
     def test_post_manual_fine_as_staff_201(self):
         self.client.force_authenticate(user=self.staff_user)
+        # Need a borrow without a fine for this test
+        new_copy = make_book_copy(self.book, self.library)
+        new_borrow = make_borrow(self.member, new_copy, self.library)
         res = self.client.post(self.url, {
-            "borrow_transaction_id": str(self.borrow.pk),
+            "borrow_transaction_id": str(new_borrow.pk),
             "fine_type": "damage",
             "amount": "75000.00",
             "description": "Cover is torn",
@@ -312,9 +438,11 @@ class FineListViewTest(APITestCase):
 
     def test_post_fine_type_overdue_rejected_409(self):
         """Staff cannot manually create an overdue fine."""
+        new_copy = make_book_copy(self.book, self.library)
+        new_borrow = make_borrow(self.member, new_copy, self.library)
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.post(self.url, {
-            "borrow_transaction_id": str(self.borrow.pk),
+            "borrow_transaction_id": str(new_borrow.pk),
             "fine_type": "overdue",
             "amount": "1000.00",
             "description": "Should be rejected",
@@ -342,19 +470,41 @@ class FineDetailViewTest(APITestCase):
         self.library = make_library(code="LIB-FD")
         self.book = make_book()
         self.copy = make_book_copy(self.book, self.library)
+
         self.member_user = make_user(email="memfd@test.com")
         self.member = make_verified_member(self.member_user)
         self.borrow = make_borrow(self.member, self.copy, self.library)
         self.fine = make_fine(self.borrow)
         self.url = f"/api/v1/transactions/fines/{self.fine.pk}/"
 
-    def test_get_fine_detail_authenticated_200(self):
+        # Other member
+        self.other_user = make_user(email="otherfd@test.com")
+        self.other_member = make_verified_member(self.other_user)
+
+        # Staff
+        self.staff_user = make_user(email="stafffd@test.com")
+        make_staff(self.staff_user, self.library, role="librarian")
+
+    def test_get_own_fine_as_member_200(self):
+        """Member can view their own fine detail."""
         self.client.force_authenticate(user=self.member_user)
         res = self.client.get(self.url)
         self.assertEqual(res.status_code, 200)
 
+    def test_get_other_fine_as_member_403(self):
+        """Member cannot view another member's fine."""
+        self.client.force_authenticate(user=self.other_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 403)
+
+    def test_get_any_fine_as_staff_200(self):
+        """Staff can view any fine detail."""
+        self.client.force_authenticate(user=self.staff_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+
     def test_get_fine_not_found_404(self):
-        self.client.force_authenticate(user=self.member_user)
+        self.client.force_authenticate(user=self.staff_user)
         res = self.client.get(f"/api/v1/transactions/fines/{uuid.uuid4()}/")
         self.assertEqual(res.status_code, 404)
 
