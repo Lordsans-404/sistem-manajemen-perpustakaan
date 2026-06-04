@@ -1,4 +1,44 @@
 from rest_framework.permissions import BasePermission
+from django.core.exceptions import ObjectDoesNotExist
+
+
+# ---------------------------------------------------------------------------
+# Access helper functions
+# ---------------------------------------------------------------------------
+
+def is_staff_user(user) -> bool:
+    """Return True if *user* has a staff_profile (any role)."""
+    try:
+        _ = user.staff_profile
+        return True
+    except ObjectDoesNotExist:
+        return False
+
+
+def get_request_member(user):
+    """
+    Return the MemberProfile linked to *user*, or None if the user has no
+    member profile.  Views should return 403 when this returns None and the
+    endpoint is member-only.
+    """
+    try:
+        return user.member_profile
+    except ObjectDoesNotExist:
+        return None
+
+
+def can_access_member(user, member) -> bool:
+    """
+    Return True if *user* is staff OR is the same person as *member*.
+    Used for detail endpoints where staff sees any record but a member only
+    sees their own.
+    """
+    if is_staff_user(user):
+        return True
+    try:
+        return user.member_profile.pk == member.pk
+    except ObjectDoesNotExist:
+        return False
 
 
 class IsMember(BasePermission):
@@ -18,7 +58,7 @@ class IsMember(BasePermission):
             return False
         try:
             return request.user.member_profile.is_verified
-        except AttributeError:
+        except ObjectDoesNotExist:
             return False
 
 
@@ -40,7 +80,7 @@ class IsStaff(BasePermission):
             # Accessing staff_profile raises RelatedObjectDoesNotExist if absent
             _ = request.user.staff_profile
             return True
-        except AttributeError:
+        except ObjectDoesNotExist:
             return False
 
 
@@ -62,5 +102,5 @@ class IsAdmin(BasePermission):
             return False
         try:
             return request.user.staff_profile.role in self.ADMIN_ROLES
-        except AttributeError:
+        except ObjectDoesNotExist:
             return False

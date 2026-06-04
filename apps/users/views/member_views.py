@@ -6,8 +6,9 @@ from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
 from config.pagination import StandardPagination
-from config.permissions import IsStaff
+from config.permissions import IsStaff, can_access_member, get_request_member, is_staff_user
 
+from apps.users.models import MemberProfile
 from apps.users.selectors import (
     get_all_members,
     get_member_by_id,
@@ -36,7 +37,21 @@ class MemberListView(APIView):
 
     def get(self, request):
         verified_only = request.query_params.get("verified") == "true"
-        members = get_all_members(verified_only=verified_only)
+
+        if is_staff_user(request.user):
+            # Staff sees all members.
+            members = get_all_members(verified_only=verified_only)
+        else:
+            # Regular authenticated users see only their own member profile.
+            own = get_request_member(request.user)
+            if own is None:
+                return error_response(
+                    message="No member profile found for the current user.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+            # Wrap as a queryset so pagination still works uniformly.
+            members = MemberProfile.objects.filter(pk=own.pk)
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(members, request)
         return paginator.get_paginated_response(
@@ -107,6 +122,13 @@ class MemberDetailView(APIView):
         member, err = self._get_member_or_404(pk)
         if err:
             return err
+
+        if not can_access_member(request.user, member):
+            return error_response(
+                message="You do not have permission to view this member profile.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         return success_response(data=MemberProfileOutputSerializer(member).data)
 
     def patch(self, request, pk):

@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -6,12 +7,13 @@ from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
 from config.pagination import StandardPagination
-from config.permissions import IsMember, IsStaff
+from config.permissions import IsMember, IsStaff, get_request_member, is_staff_user
 
 from apps.catalog.selectors import get_book_copy_by_id
 from apps.transactions.selectors import (
     get_all_borrows,
     get_borrow_by_id,
+    get_borrows_by_member,
     get_overdue_borrows,
 )
 from apps.transactions.serializers import (
@@ -37,21 +39,37 @@ class BorrowListView(APIView):
     """
 
     def get_permissions(self):
-        if self.request.method == "GET":
-            return [IsAuthenticated()]
-        return [IsMember()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         status_param = request.query_params.get("status")
 
-        if status_param == "overdue":
-            borrows = get_overdue_borrows()
-        elif status_param == "active":
-            borrows = get_all_borrows(returned=False)
-        elif status_param == "returned":
-            borrows = get_all_borrows(returned=True)
+        if is_staff_user(request.user):
+            # Staff sees all borrows with full filter support.
+            if status_param == "overdue":
+                borrows = get_overdue_borrows()
+            elif status_param == "active":
+                borrows = get_all_borrows(returned=False)
+            elif status_param == "returned":
+                borrows = get_all_borrows(returned=True)
+            else:
+                borrows = get_all_borrows()
         else:
-            borrows = get_all_borrows()
+            # Member only sees their own borrows.
+            member = get_request_member(request.user)
+            if member is None:
+                return error_response(
+                    message="No member profile found for the current user.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+            qs = get_borrows_by_member(member.pk)
+            if status_param == "overdue":
+                qs = qs.filter(return_date__isnull=True, due_date__lt=date.today())
+            elif status_param == "active":
+                qs = qs.filter(return_date__isnull=True)
+            elif status_param == "returned":
+                qs = qs.exclude(return_date__isnull=True)
+            borrows = qs
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(borrows, request)
@@ -75,6 +93,22 @@ class BorrowListView(APIView):
                 message="Member not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        # Check if member is verified (if borrowing for themselves)
+        if not member.is_verified:
+            return error_response(
+                message="Member account is not verified. Please contact library staff.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Non-staff members can only borrow on behalf of themselves.
+        if not is_staff_user(request.user):
+            own = get_request_member(request.user)
+            if own is None or own.pk != member.pk:
+                return error_response(
+                    message="You can only create borrows for your own member account.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         book_copy = get_book_copy_by_id(data["book_copy_id"])
         if not book_copy:
@@ -123,6 +157,16 @@ class BorrowDetailView(APIView):
                 message="Borrow transaction not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        # Non-staff may only view their own borrow records.
+        if not is_staff_user(request.user):
+            own = get_request_member(request.user)
+            if own is None or borrow.member_id != own.pk:
+                return error_response(
+                    message="You do not have permission to view this borrow transaction.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         return success_response(data=BorrowTransactionOutputSerializer(borrow).data)
 
 

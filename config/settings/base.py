@@ -129,6 +129,8 @@ LOGGING = {
 # ---------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {"anon": "10/min"},
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "config.authentication.SupabaseJWTAuthentication",
     ],

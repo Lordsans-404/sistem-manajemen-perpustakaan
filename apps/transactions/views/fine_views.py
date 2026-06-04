@@ -6,9 +6,14 @@ from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
 from config.pagination import StandardPagination
-from config.permissions import IsAdmin, IsStaff
+from config.permissions import IsAdmin, IsStaff, get_request_member, is_staff_user
 
-from apps.transactions.selectors import get_all_fines, get_borrow_by_id, get_fine_by_id
+from apps.transactions.selectors import (
+    get_all_fines,
+    get_borrow_by_id,
+    get_fine_by_id,
+    get_fines_by_member,
+)
 from apps.transactions.serializers import (
     FineInputSerializer,
     FineOutputSerializer,
@@ -33,7 +38,23 @@ class FineListView(APIView):
 
     def get(self, request):
         payment_status = request.query_params.get("payment_status")
-        fines = get_all_fines(payment_status=payment_status)
+
+        if is_staff_user(request.user):
+            # Staff sees all fines, optionally filtered by payment_status.
+            fines = get_all_fines(payment_status=payment_status)
+        else:
+            # Member only sees fines tied to their own borrows.
+            member = get_request_member(request.user)
+            if member is None:
+                return error_response(
+                    message="No member profile found for the current user.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+            qs = get_fines_by_member(member.pk)
+            if payment_status:
+                qs = qs.filter(payment_status=payment_status)
+            fines = qs
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(fines, request)
         return paginator.get_paginated_response(
@@ -88,6 +109,16 @@ class FineDetailView(APIView):
                 message="Fine not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        # Non-staff may only view fines that belong to their own borrow transactions.
+        if not is_staff_user(request.user):
+            own = get_request_member(request.user)
+            if own is None or fine.borrow_transaction.member_id != own.pk:
+                return error_response(
+                    message="You do not have permission to view this fine.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         return success_response(data=FineOutputSerializer(fine).data)
 
 

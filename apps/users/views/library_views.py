@@ -1,7 +1,7 @@
 import logging
 
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
@@ -29,7 +29,7 @@ class LibraryListView(APIView):
 
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [AllowAny()]
         return [IsStaff()]
 
     def get(self, request):

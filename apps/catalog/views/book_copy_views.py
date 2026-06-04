@@ -1,7 +1,7 @@
 import logging
 
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
@@ -32,7 +32,7 @@ class BookCopyListView(APIView):
 
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [AllowAny()]
         return [IsStaff()]
 
     def get(self, request):
@@ -100,7 +100,7 @@ class BookCopyDetailView(APIView):
 
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [AllowAny()]
         return [IsStaff()]
 
     def _get_copy_or_404(self, copy_id):

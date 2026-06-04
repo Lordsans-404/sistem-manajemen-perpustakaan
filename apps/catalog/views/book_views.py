@@ -3,7 +3,7 @@ import logging
 from django.db.models import ProtectedError
 
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
@@ -29,7 +29,7 @@ class BookListView(APIView):
 
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [AllowAny()]
         return [IsStaff()]
 
     def get(self, request):
@@ -71,7 +71,7 @@ class BookDetailView(APIView):
 
     def get_permissions(self):
         if self.request.method == "GET":
-            return [IsAuthenticated()]
+            return [AllowAny()]
         return [IsStaff()]
 
     def _get_book_or_404(self, book_id):
