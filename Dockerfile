@@ -25,7 +25,18 @@ COPY . /app/
 
 # Kumpulkan static files (agar bisa dilayani oleh WhiteNoise)
 # (Membutuhkan dummy SECRET_KEY agar tidak error saat build)
-RUN SECRET_KEY=dummy-secret-key-for-build \
+RUN SECRET_KEY=dummy \
+    SUPABASE_URL=dummy \
+    SUPABASE_PROJECT_REF=dummy \
+    SUPABASE_ANON_KEY=dummy \
+    SUPABASE_SERVICE_ROLE_KEY=dummy \
+    DB_NAME=dummy \
+    DB_USER=dummy \
+    DB_PASSWORD=dummy \
+    DB_HOST=dummy \
+    ALLOWED_HOSTS=dummy \
+    CSRF_TRUSTED_ORIGINS=dummy \
+    CORS_ALLOWED_ORIGINS=dummy \
     DJANGO_SETTINGS_MODULE=config.settings.production \
     python manage.py collectstatic --noinput
 
