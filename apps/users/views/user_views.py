@@ -1,13 +1,15 @@
 import logging
 
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
-from config.api_response import error_response, success_response
+from config.api_response import error_response, success_response 
 
-from apps.users.selectors import get_user_by_id
-from apps.users.serializers import (
+from apps.users.serializers import ( 
+    MemberProfileOutputSerializer,
+    StaffProfileOutputSerializer,
     UserOutputSerializer,
     UserRegisterInputSerializer,
     UserUpdateInputSerializer,
@@ -61,8 +63,34 @@ class UserMeView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    def _build_profile_data(self, user):
+        """
+        Compose full profile response from multiple serializers.
+        Attaches member_profile and staff_profile conditionally.
+        Both default to null if the user has no linked profile.
+        """
+        data = dict(UserOutputSerializer(user).data)
+
+        # Attach member profile — null if user has no member profile yet.
+        try:
+            data["member_profile"] = MemberProfileOutputSerializer(
+                user.member_profile
+            ).data
+        except ObjectDoesNotExist:
+            data["member_profile"] = None
+
+        # Attach staff profile — null if user is not a staff member.
+        try:
+            data["staff_profile"] = StaffProfileOutputSerializer(
+                user.staff_profile
+            ).data
+        except ObjectDoesNotExist:
+            data["staff_profile"] = None
+
+        return data
+
     def get(self, request):
-        return success_response(data=UserOutputSerializer(request.user).data)
+        return success_response(data=self._build_profile_data(request.user))
 
     def patch(self, request):
         serializer = UserUpdateInputSerializer(data=request.data)
@@ -79,6 +107,6 @@ class UserMeView(APIView):
             phone_number=data.get("phone_number"),
         )
         return success_response(
-            data=UserOutputSerializer(user).data,
+            data=self._build_profile_data(user),
             message="Profile updated successfully.",
         )
