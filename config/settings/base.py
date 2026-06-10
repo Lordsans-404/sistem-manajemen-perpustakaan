@@ -92,6 +92,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # app_label stays 'users' because UsersConfig sets label = 'users'
 AUTH_USER_MODEL = 'users.User'
 
+# Only For Development: Allow self member registration
+ALLOW_SELF_MEMBER_REGISTRATION = True
+
 # Custom Logging
 LOGGING = {
     'version': 1,

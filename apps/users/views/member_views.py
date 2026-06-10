@@ -20,6 +20,7 @@ from apps.users.serializers import (
     MemberProfileUpdateInputSerializer,
 )
 from apps.users.services import create_member_profile, update_member_profile, verify_member
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,10 @@ class MemberListView(APIView):
     def get_permissions(self):
         if self.request.method == "GET":
             return [IsAuthenticated()]
+        if self.request.method == "POST":
+            # Feature flag — self-register for development
+            if getattr(settings, "ALLOW_SELF_MEMBER_REGISTRATION", False):
+                return [IsAuthenticated()]
         return [IsStaff()]
 
     def get(self, request):
@@ -59,8 +64,14 @@ class MemberListView(APIView):
         )
 
     def post(self, request):
-        # Expect user_id in the body to link the profile
+        # For development allow self member registration temporarily
         user_id = request.data.get("user_id")
+        if (
+            getattr(settings, "ALLOW_SELF_MEMBER_REGISTRATION", False)
+            and not is_staff_user(request.user)
+        ):
+            user_id = str(request.user.pk)
+
         if not user_id:
             return error_response(
                 message="user_id is required.",
