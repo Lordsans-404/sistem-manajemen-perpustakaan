@@ -36,15 +36,21 @@ class BookCopyListView(APIView):
         return [IsStaff()]
 
     def get(self, request):
-        qs = get_all_book_copies()
-
-        # Optional filtering by book or library
         book_id = request.query_params.get("book_id")
         library_id = request.query_params.get("library_id")
-        if book_id:
-            qs = qs.filter(book_id=book_id)
-        if library_id:
-            qs = qs.filter(library_id=library_id)
+        available_param = request.query_params.get("available")
+
+        if available_param == "true":
+            qs = get_available_copies(book_id=book_id, library_id=library_id)
+        else:
+            qs = get_all_book_copies()
+            if book_id:
+                qs = qs.filter(book_id=book_id)
+            if library_id:
+                qs = qs.filter(library_id=library_id)
+            
+            if available_param == "false":
+                qs = qs.filter(borrow_transactions__return_date__isnull=True)
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
