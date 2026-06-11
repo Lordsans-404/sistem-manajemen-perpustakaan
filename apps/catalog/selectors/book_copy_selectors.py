@@ -1,5 +1,7 @@
 from apps.catalog.models import BookCopy
 
+from django.db.models import Exists, OuterRef
+
 
 def get_book_copy_by_id(copy_id):
     """Return a BookCopy by primary key with related book and library, or None."""
@@ -31,17 +33,22 @@ def get_copies_by_library(library_id):
     )
 
 
+    
 def get_available_copies(book_id=None, library_id=None):
     """
     Return copies that are NOT currently borrowed (no active borrow transaction).
     Optionally filter by book or library.
     An 'active' borrow transaction means return_date is NULL.
     """
+    active_borrow = BorrowTransaction.objects.filter(
+        book_copy=OuterRef("pk"),
+        return_date__isnull=True,
+    )
     qs = (
         BookCopy.objects
         .select_related("book", "library")
-        .exclude(borrow_transactions__return_date__isnull=True)
-        .distinct()
+        .annotate(is_borrowed=Exists(active_borrow))
+        .filter(is_borrowed=False)
     )
     if book_id:
         qs = qs.filter(book_id=book_id)

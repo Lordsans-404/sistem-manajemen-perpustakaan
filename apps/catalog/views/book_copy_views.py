@@ -8,6 +8,8 @@ from config.api_response import error_response, success_response
 from config.pagination import StandardPagination
 from config.permissions import IsStaff
 
+from django.db.models import Exists, OuterRef
+
 from apps.catalog.selectors import (
     get_all_book_copies,
     get_available_copies,
@@ -51,7 +53,11 @@ class BookCopyListView(APIView):
                 qs = qs.filter(library_id=library_id)
             
             if available_param == "false":
-                qs = qs.filter(borrow_transactions__return_date__isnull=True).distinct()
+                active_borrow = BorrowTransaction.objects.filter(
+                    book_copy=OuterRef("pk"),
+                    return_date__isnull=True,
+                )
+                qs = qs.annotate(is_borrowed=Exists(active_borrow)).filter(is_borrowed=True)
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
