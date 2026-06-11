@@ -1,3 +1,5 @@
+from django.db.models import Q
+
 from apps.catalog.models import Book
 
 
@@ -13,18 +15,20 @@ def get_all_books():
 
 def search_books(query: str):
     """
-    Search books by title, author, or category.
+    Search books by title, author, category, ISBN, or publisher.
     Uses icontains for case-insensitive partial matching.
     """
     return (
-        Book.objects
-        .filter(
-            # title OR author OR category match
-            title__icontains=query,
+        Book.objects.filter(
+            Q(title__icontains=query)
+            | Q(author__icontains=query)
+            | Q(category__icontains=query)
+            | Q(copies__isbn__icontains=query)
+            | Q(copies__publisher__icontains=query)
         )
-        | Book.objects.filter(author__icontains=query)
-        | Book.objects.filter(category__icontains=query)
-    ).distinct().order_by("title")
+        .distinct()
+        .order_by("title")
+    )
 
 
 def get_books_by_category(category: str):

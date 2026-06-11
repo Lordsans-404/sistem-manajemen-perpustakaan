@@ -106,6 +106,26 @@ class BookListViewTest(APITestCase):
         titles = [r["title"] for r in res.data["data"]["results"]]
         self.assertTrue(any("Django" in t for t in titles))
 
+    def test_get_books_advanced_search_returns_filtered_results(self):
+        b1 = Book.objects.create(title="Advanced Django", author="Tom", category="Tech")
+        BookCopy.objects.create(book=b1, library=self.library, isbn="978-1234", publisher="TechPub")
+        b2 = Book.objects.create(title="React Guide", author="John", category="Frontend")
+        BookCopy.objects.create(book=b2, library=self.library, isbn="978-5678", publisher="WebPub")
+
+        # Search by ISBN
+        res = self.client.get(self.url + "?search=978-1234")
+        self.assertEqual(res.status_code, 200)
+        titles = [r["title"] for r in res.data["data"]["results"]]
+        self.assertIn("Advanced Django", titles)
+        self.assertNotIn("React Guide", titles)
+
+        # Search by Publisher
+        res = self.client.get(self.url + "?search=WebPub")
+        self.assertEqual(res.status_code, 200)
+        titles = [r["title"] for r in res.data["data"]["results"]]
+        self.assertIn("React Guide", titles)
+        self.assertNotIn("Advanced Django", titles)
+
     def test_post_book_as_staff_201(self):
         self.client.force_authenticate(user=self.staff_user)
         res = self.client.post(self.url, {
