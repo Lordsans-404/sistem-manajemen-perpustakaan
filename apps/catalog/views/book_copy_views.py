@@ -10,6 +10,7 @@ from config.permissions import IsStaff
 
 from apps.catalog.selectors import (
     get_all_book_copies,
+    get_available_copies,
     get_book_by_id,
     get_book_copy_by_id,
 )
@@ -50,7 +51,7 @@ class BookCopyListView(APIView):
                 qs = qs.filter(library_id=library_id)
             
             if available_param == "false":
-                qs = qs.filter(borrow_transactions__return_date__isnull=True)
+                qs = qs.filter(borrow_transactions__return_date__isnull=True).distinct()
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)

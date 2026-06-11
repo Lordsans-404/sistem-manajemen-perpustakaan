@@ -41,6 +41,7 @@ def get_available_copies(book_id=None, library_id=None):
         BookCopy.objects
         .select_related("book", "library")
         .exclude(borrow_transactions__return_date__isnull=True)
+        .distinct()
     )
     if book_id:
         qs = qs.filter(book_id=book_id)
