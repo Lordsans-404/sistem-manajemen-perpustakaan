@@ -1,4 +1,4 @@
-from apps.catalog.models import BookCopy
+from apps.catalog.models import BookCopy, BorrowTransaction
 
 from django.db.models import Exists, OuterRef
 
