@@ -36,45 +36,40 @@ logger = logging.getLogger(__name__)
 class BorrowListView(APIView):
     """
     GET  /api/v1/transactions/borrows/   — list all borrows
-         Supports query params:
-           ?status=active    → unreturned only
-           ?status=returned  → returned only
-           ?status=overdue   → overdue only
     POST /api/v1/transactions/borrows/   — create a new borrow (borrow a book)
     """
 
     def get_permissions(self):
-        return [IsAuthenticated()]
+        if self.request.method == "GET":
+            return [IsAuthenticated()]
+        # POST
+        return [IsMember() | IsStaff()]
 
     def get(self, request):
         status_param = request.query_params.get("status")
 
         if is_staff_user(request.user):
-            # Staff sees all borrows with full filter support.
             if status_param == "overdue":
                 borrows = get_overdue_borrows()
-            elif status_param == "active":
-                borrows = get_all_borrows(returned=False)
-            elif status_param == "returned":
-                borrows = get_all_borrows(returned=True)
+            elif status_param in ["pending", "active", "returned", "failed"]:
+                borrows = get_all_borrows(status=status_param)
             else:
                 borrows = get_all_borrows()
         else:
-            # Member only sees their own borrows.
             member = get_request_member(request.user)
             if member is None:
                 return error_response(
                     message="No member profile found for the current user.",
                     status_code=status.HTTP_403_FORBIDDEN,
                 )
-            qs = get_borrows_by_member(member.pk)
             if status_param == "overdue":
-                qs = qs.filter(return_date__isnull=True, due_date__lt=date.today())
-            elif status_param == "active":
-                qs = qs.filter(return_date__isnull=True)
-            elif status_param == "returned":
-                qs = qs.exclude(return_date__isnull=True)
-            borrows = qs
+                borrows = get_borrows_by_member(
+                    member.pk, status="active"
+                ).filter(due_date__lt=date.today())
+            elif status_param in ["pending", "active", "returned", "failed"]:
+                borrows = get_borrows_by_member(member.pk, status=status_param)
+            else:
+                borrows = get_borrows_by_member(member.pk)
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(borrows, request)
