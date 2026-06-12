@@ -1,6 +1,8 @@
 from apps.transactions.views.borrow_views import (
+    BorrowApproveView,
     BorrowDetailView,
     BorrowListView,
+    BorrowRejectView,
     BorrowReturnView,
 )
 from apps.transactions.views.fine_views import (
@@ -14,6 +16,8 @@ __all__ = [
     # borrow
     "BorrowListView",
     "BorrowDetailView",
+    "BorrowApproveView",
+    "BorrowRejectView",
     "BorrowReturnView",
     # fine
     "FineListView",

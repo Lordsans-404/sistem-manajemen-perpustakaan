@@ -22,7 +22,12 @@ from apps.transactions.serializers import (
     BorrowTransactionOutputSerializer,
     BorrowTransactionReturnInputSerializer,
 )
-from apps.transactions.services import create_borrow_transaction, return_book
+from apps.transactions.services import (
+    approve_borrow,
+    create_borrow_transaction,
+    reject_borrow,
+    return_book,
+)
 from apps.users.selectors import get_library_by_id, get_member_by_id
 
 logger = logging.getLogger(__name__)
@@ -138,7 +143,7 @@ class BorrowListView(APIView):
         borrow = get_borrow_by_id(borrow.pk)
         return success_response(
             data=BorrowTransactionOutputSerializer(borrow).data,
-            message="Book borrowed successfully.",
+            message="Borrow request submitted and is pending staff approval.",
             status_code=status.HTTP_201_CREATED,
         )
 
@@ -213,4 +218,60 @@ class BorrowReturnView(APIView):
         return success_response(
             data=BorrowTransactionOutputSerializer(borrow).data,
             message=msg,
+        )
+
+
+class BorrowApproveView(APIView):
+    """
+    POST /api/v1/transactions/borrows/{id}/approve/
+    Approve a pending borrow request.
+    """
+
+    permission_classes = [IsStaff]
+
+    def post(self, request, pk):
+        borrow = get_borrow_by_id(pk)
+        if not borrow:
+            return error_response(
+                message="Borrow transaction not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            borrow = approve_borrow(borrow=borrow)
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=status.HTTP_409_CONFLICT)
+
+        borrow = get_borrow_by_id(borrow.pk)
+        return success_response(
+            data=BorrowTransactionOutputSerializer(borrow).data,
+            message="Borrow request approved successfully.",
+        )
+
+
+class BorrowRejectView(APIView):
+    """
+    POST /api/v1/transactions/borrows/{id}/reject/
+    Reject a pending borrow request.
+    """
+
+    permission_classes = [IsStaff]
+
+    def post(self, request, pk):
+        borrow = get_borrow_by_id(pk)
+        if not borrow:
+            return error_response(
+                message="Borrow transaction not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            borrow = reject_borrow(borrow=borrow)
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=status.HTTP_409_CONFLICT)
+
+        borrow = get_borrow_by_id(borrow.pk)
+        return success_response(
+            data=BorrowTransactionOutputSerializer(borrow).data,
+            message="Borrow request rejected successfully.",
         )

@@ -15,6 +15,12 @@ from apps.users.models import Library, MemberProfile, TimestampMixin
 class BorrowTransaction(TimestampMixin):
     """Records a single book borrowing event by a member."""
 
+    class Status(models.TextChoices):
+        PENDING  = "pending",  "Pending"   # created, waiting for staff approval
+        ACTIVE   = "active",   "Active"    # approved by staff, book handed over
+        RETURNED = "returned", "Returned"  # book returned by member
+        FAILED   = "failed",   "Failed"    # expired (>1 day pending) or rejected by staff
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     member = models.ForeignKey(
         MemberProfile,
@@ -31,6 +37,13 @@ class BorrowTransaction(TimestampMixin):
         on_delete=models.PROTECT,
         related_name="borrow_transactions",
     )
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        db_index=True,
+        help_text="Lifecycle status of this borrow transaction.",
+    )
     borrow_date = models.DateField(default=date.today)
     due_date = models.DateField()
     return_date = models.DateField(
@@ -46,12 +59,16 @@ class BorrowTransaction(TimestampMixin):
         ordering = ["-borrow_date"]
 
     def __str__(self):
-        status = "Returned" if self.return_date else "Borrowed"
-        return f"{self.member.user.name} — {self.book_copy.book.title} [{status}]"
+        return (
+            f"{self.member.user.name} — "
+            f"{self.book_copy.book.title} [{self.get_status_display()}]"
+        )
 
     @property
     def is_overdue(self) -> bool:
-        """True if the book has not been returned and the due date has passed."""
+        """True if the book is active, not yet returned, and due date has passed."""
+        if self.status != self.Status.ACTIVE:
+            return False
         if self.return_date:
             return False
         return date.today() > self.due_date
@@ -88,10 +105,10 @@ class Fine(TimestampMixin):
         WAIVED = "waived", "Waived"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    borrow_transaction = models.OneToOneField(
+    borrow_transaction = models.ForeignKey(
         BorrowTransaction,
         on_delete=models.CASCADE,
-        related_name="fine",
+        related_name="fines",
     )
     fine_type = models.CharField(
         max_length=10,
@@ -129,4 +146,4 @@ class Fine(TimestampMixin):
         return (
             f"Fine for {self.borrow_transaction} — "
             f"IDR {self.amount:,.0f} [{self.get_payment_status_display()}]"
-        )
+    )

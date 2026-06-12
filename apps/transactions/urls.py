@@ -1,8 +1,10 @@
 from django.urls import path
 
 from apps.transactions.views import (
+    BorrowApproveView,
     BorrowDetailView,
     BorrowListView,
+    BorrowRejectView,
     BorrowReturnView,
     FineDetailView,
     FineListView,
@@ -16,6 +18,8 @@ urlpatterns = [
     # --- BorrowTransaction ---
     path("borrows/", BorrowListView.as_view(), name="borrow-list"),
     path("borrows/<uuid:pk>/", BorrowDetailView.as_view(), name="borrow-detail"),
+    path("borrows/<uuid:pk>/approve/", BorrowApproveView.as_view(), name="borrow-approve"),
+    path("borrows/<uuid:pk>/reject/", BorrowRejectView.as_view(), name="borrow-reject"),
     path("borrows/<uuid:pk>/return/", BorrowReturnView.as_view(), name="borrow-return"),
 
     # --- Fine ---
