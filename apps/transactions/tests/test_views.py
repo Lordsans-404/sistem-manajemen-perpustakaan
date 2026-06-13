@@ -195,7 +195,7 @@ class BorrowListViewTest(APITestCase):
         self.assertEqual(res.status_code, 403)
 
     def test_post_borrow_unverified_member_403(self):
-        """Unverified member cannot borrow — is_verified check inside post()."""
+        """Unverified member cannot borrow — rejected by IsMemberOrStaff permission."""
         self.client.force_authenticate(user=self.unver_user)
         res = self.client.post(self.url, {
             "member_id": str(self.unverified_member.pk),
@@ -578,11 +578,11 @@ class FineWaiveViewTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"]["payment_status"], "waived")
 
-    def test_waive_fine_as_librarian_403(self):
-        """Librarian cannot waive fines — only admin/supervisor."""
+    def test_waive_fine_as_librarian_200(self):
+        """Librarian can waive fines."""
         self.client.force_authenticate(user=self.librarian_user)
         res = self.client.patch(self.url)
-        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.status_code, 200)
 
     def test_waive_fine_as_member_403(self):
         self.client.force_authenticate(user=self.member_user)

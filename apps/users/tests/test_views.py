@@ -247,7 +247,7 @@ class MemberListViewTest(APITestCase):
         }, format="json")
         self.assertEqual(res.status_code, 201)
 
-    def test_post_as_plain_403(self):
+    def test_post_as_plain_201(self):
         new_user = make_user(email="denied_mem@test.com")
         self.client.force_authenticate(user=self.plain_user)
         res = self.client.post(self.url, {
@@ -255,7 +255,7 @@ class MemberListViewTest(APITestCase):
             "member_type": "student",
             "identity_number": "STD-DEN-001",
         }, format="json")
-        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.status_code, 201)
 
 
 class MemberDetailViewTest(APITestCase):

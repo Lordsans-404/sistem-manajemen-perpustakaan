@@ -104,3 +104,34 @@ class IsAdmin(BasePermission):
             return request.user.staff_profile.role in self.ADMIN_ROLES
         except ObjectDoesNotExist:
             return False
+
+
+class IsMemberOrStaff(BasePermission):
+    """
+    Allows access to verified library members OR any staff.
+
+    Conditions (OR):
+    - User has a StaffProfile (any role), OR
+    - User has a verified MemberProfile (verified_at is not None).
+
+    Used for endpoints like POST /borrows/ where both staff and verified
+    members should have access, but plain authenticated users (no profile)
+    should be rejected.
+    """
+
+    message = "Access denied. You must be a verified member or a library staff member."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        # Check staff first (faster, more common path for mutations)
+        try:
+            _ = request.user.staff_profile
+            return True
+        except ObjectDoesNotExist:
+            pass
+        # Fallback: check if verified member
+        try:
+            return request.user.member_profile.is_verified
+        except ObjectDoesNotExist:
+            return False

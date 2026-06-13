@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
 from config.pagination import StandardPagination
-from config.permissions import IsMember, IsStaff, get_request_member, is_staff_user
+from config.permissions import IsMember, IsMemberOrStaff, IsStaff, get_request_member, is_staff_user
 
 from apps.catalog.selectors import get_book_copy_by_id
 from apps.transactions.selectors import (
@@ -43,8 +43,8 @@ class BorrowListView(APIView):
     def get_permissions(self):
         if self.request.method == "GET":
             return [IsAuthenticated()]
-        # POST
-        return [IsMember() | IsStaff()]
+        # POST — only verified members or staff; plain users (no profile) are blocked
+        return [IsMemberOrStaff()]
 
     def get(self, request):
         status_param = request.query_params.get("status")

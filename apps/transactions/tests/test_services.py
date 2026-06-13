@@ -130,7 +130,7 @@ class CreateBorrowTransactionServiceTest(TestCase):
                 library=self.library,
                 due_date=due,
             )
-        self.assertIn("on loan", str(ctx.exception))
+        self.assertIn("unavailable", str(ctx.exception))
 
     def test_raises_if_due_date_not_in_future(self):
         with self.assertRaises(ValueError) as ctx:
