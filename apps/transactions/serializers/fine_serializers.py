@@ -17,8 +17,7 @@ class FineInputSerializer(serializers.Serializer):
     )
     fine_type = serializers.ChoiceField(
         choices=Fine.FineType.choices,
-        default=Fine.FineType.OVERDUE,
-        help_text="Reason for the fine. 'overdue' is auto-generated; others are set manually by staff.",
+        help_text="Reason for the fine. 'damage', 'loss', or 'other' (manual fines).",
     )
     amount = serializers.DecimalField(
         max_digits=12,

@@ -2,6 +2,7 @@ from apps.transactions.services.borrow_service import (
     approve_borrow,
     create_borrow_transaction,
     reject_borrow,
+    update_borrow_status,
 )
 from apps.transactions.services.return_service import (
     DAILY_FINE_RATE,
@@ -18,6 +19,7 @@ __all__ = [
     "approve_borrow",
     "create_borrow_transaction",
     "reject_borrow",
+    "update_borrow_status",
     # return
     "return_book",
     "DAILY_FINE_RATE",

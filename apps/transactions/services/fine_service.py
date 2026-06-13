@@ -27,6 +27,12 @@ def create_manual_fine(
             "Use fine_type 'damage', 'loss', or 'other' for manual fines."
         )
 
+    if borrow.status in [BorrowTransaction.Status.PENDING, BorrowTransaction.Status.FAILED]:
+        raise ValueError(
+            f"Cannot create fine for a transaction with status '{borrow.status}'. "
+            "Fines can only be created for active or returned borrows."
+        )
+
     if Fine.objects.filter(borrow_transaction=borrow).exists():
         raise ValueError(
             f"A fine already exists for borrow transaction '{borrow.pk}'."

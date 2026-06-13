@@ -37,6 +37,17 @@ def create_borrow_transaction(
     if due_date <= effective_borrow_date:
         raise ValueError("due_date must be after borrow_date.")
 
+    if book_copy.condition == BookCopy.Condition.LOST:
+        raise ValueError(f"Cannot borrow book copy '{book_copy.pk}' because its condition is 'lost'.")
+
+    # Check if member has unpaid fines
+    has_unpaid_fines = Fine.objects.filter(
+        borrow_transaction__member=member,
+        payment_status=Fine.PaymentStatus.UNPAID
+    ).exists()
+    if has_unpaid_fines:
+        raise ValueError("Member has unpaid fines and cannot borrow new books until they are paid.")
+
     # Guard against double-borrowing — block if copy has pending or active transaction.
     # (failed/returned transactions are fine — book is available again)
     unavailable = BorrowTransaction.objects.filter(
@@ -159,6 +170,9 @@ def return_book(*, borrow: BorrowTransaction, return_date: date) -> BorrowTransa
     if return_date > date.today():
         raise ValueError("return_date cannot be in the future.")
 
+    if return_date < borrow.borrow_date:
+        raise ValueError("return_date cannot be before the borrow_date.")
+
     with transaction.atomic():
         borrow.return_date = return_date
         borrow.status = BorrowTransaction.Status.RETURNED
@@ -183,6 +197,21 @@ def return_book(*, borrow: BorrowTransaction, return_date: date) -> BorrowTransa
         "borrow.returned borrow_id=%s return_date=%s",
         borrow.pk, return_date,
     )
+    return borrow
+
+
+def update_borrow_status(*, borrow: BorrowTransaction, new_status: str) -> BorrowTransaction:
+    """
+    Manually override the status of a borrow transaction.
+    Intended for staff to correct mistakes (e.g. FAILED -> PENDING).
+    """
+    if new_status not in BorrowTransaction.Status.values:
+        raise ValueError(f"Invalid status: '{new_status}'.")
+
+    borrow.status = new_status
+    borrow.save(update_fields=["status", "updated_at"])
+
+    logger.info("borrow.status_updated borrow_id=%s new_status=%s", borrow.pk, new_status)
     return borrow
 
 

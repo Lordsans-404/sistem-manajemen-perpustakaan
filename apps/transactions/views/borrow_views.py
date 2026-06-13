@@ -27,6 +27,7 @@ from apps.transactions.services import (
     create_borrow_transaction,
     reject_borrow,
     return_book,
+    update_borrow_status,
 )
 from apps.users.selectors import get_library_by_id, get_member_by_id
 
@@ -168,6 +169,38 @@ class BorrowDetailView(APIView):
                 )
 
         return success_response(data=BorrowTransactionOutputSerializer(borrow).data)
+
+    def patch(self, request, pk):
+        if not is_staff_user(request.user):
+            return error_response(
+                message="Only staff can update borrow transactions manually.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        borrow = get_borrow_by_id(pk)
+        if not borrow:
+            return error_response(
+                message="Borrow transaction not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        new_status = request.data.get("status")
+        if not new_status:
+            return error_response(
+                message="status field is required.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            borrow = update_borrow_status(borrow=borrow, new_status=new_status)
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=status.HTTP_400_BAD_REQUEST)
+
+        borrow = get_borrow_by_id(borrow.pk)
+        return success_response(
+            data=BorrowTransactionOutputSerializer(borrow).data,
+            message="Borrow status updated successfully.",
+        )
 
 
 class BorrowReturnView(APIView):

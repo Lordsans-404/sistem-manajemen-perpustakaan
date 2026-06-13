@@ -165,7 +165,7 @@ class FineWaiveView(APIView):
     Waive a fine (staff/supervisor discretion).
     """
 
-    permission_classes = [IsAdmin]
+    permission_classes = [IsStaff]
 
     def patch(self, request, pk):
         fine = get_fine_by_id(pk)
