@@ -46,7 +46,16 @@ def create_user(*, name: str, email: str, password: str, **extra_fields) -> User
             "user.create_failed email=%s — rolling back Supabase Auth uid=%s",
             email, supabase_uid,
         )
-        delete_from_supabase(uid=supabase_uid)
+        try:
+            delete_from_supabase(uid=supabase_uid)
+        except RuntimeError:
+            # Rollback itself failed — orphaned entry exists in Supabase.
+            # The original Django error is still raised so the caller gets a proper
+            # response, but the Supabase entry must be cleaned up manually.
+            logger.critical(
+                "user.orphaned_supabase_entry email=%s uid=%s — DELETE MANUALLY FROM SUPABASE DASHBOARD",
+                email, supabase_uid,
+            )
         raise
 
     logger.info("user.created user_id=%s email=%s supabase_uid=%s", user.pk, user.email, supabase_uid)

@@ -95,6 +95,20 @@ class CreateUserServiceTest(TestCase):
                 create_user(name="Rollback", email="rollback@example.com", password="pass1234")
         mock_delete.assert_called_once_with(uid=FAKE_SUPABASE_UID)
 
+    @patch(PATCH_DELETE, side_effect=RuntimeError("Rollback failed"))
+    @patch(PATCH_REGISTER, return_value=FAKE_SUPABASE_UID)
+    def test_create_user_logs_critical_when_rollback_fails(self, mock_register, mock_delete):
+        """If Django DB write fails AND Supabase rollback fails, original error is still raised."""
+        with patch("apps.users.services.user_service.User.objects.create_user",
+                   side_effect=Exception("DB error")):
+            with patch("apps.users.services.user_service.logger.critical") as mock_critical:
+                with self.assertRaises(Exception) as ctx:
+                    create_user(name="Orphan", email="orphan@example.com", password="pass1234")
+                
+                self.assertIn("DB error", str(ctx.exception))
+                mock_critical.assert_called_once()
+                self.assertIn("DELETE MANUALLY", mock_critical.call_args[0][0])
+
 
 # ---------------------------------------------------------------------------
 # update_user

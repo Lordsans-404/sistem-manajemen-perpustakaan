@@ -96,8 +96,7 @@ AUTH_USER_MODEL = 'users.User'
 ALLOW_SELF_MEMBER_REGISTRATION = True
 
 # Custom Logging
-# Cloud Run hanya baca stdout — jangan pakai file handler di production.
-# Semua log diarahkan ke console (stdout) agar masuk Cloud Logging.
+# Cloud Run only reads stdout, not file logs
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
