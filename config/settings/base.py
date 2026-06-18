@@ -96,12 +96,14 @@ AUTH_USER_MODEL = 'users.User'
 ALLOW_SELF_MEMBER_REGISTRATION = True
 
 # Custom Logging
+# Cloud Run hanya baca stdout — jangan pakai file handler di production.
+# Semua log diarahkan ke console (stdout) agar masuk Cloud Logging.
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
     },
@@ -110,19 +112,19 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs/django.log',
-            'formatter': 'verbose',
-        },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'WARNING',
+        'level': 'INFO',
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
