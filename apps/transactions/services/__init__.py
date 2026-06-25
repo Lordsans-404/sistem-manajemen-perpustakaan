@@ -5,7 +5,6 @@ from apps.transactions.services.borrow_service import (
     update_borrow_status,
 )
 from apps.transactions.services.return_service import (
-    DAILY_FINE_RATE,
     return_book,
 )
 from apps.transactions.services.fine_service import (
@@ -22,7 +21,6 @@ __all__ = [
     "update_borrow_status",
     # return
     "return_book",
-    "DAILY_FINE_RATE",
     # fine
     "create_manual_fine",
     "pay_fine",

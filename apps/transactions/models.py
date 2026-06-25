@@ -141,6 +141,13 @@ class Fine(TimestampMixin):
         db_table = "fines"
         verbose_name = "Fine"
         verbose_name_plural = "Fines"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["borrow_transaction", "fine_type"],
+                condition=models.Q(fine_type="overdue"),
+                name="unique_overdue_fine_per_transaction",
+            )
+        ]
 
     def __str__(self):
         return (

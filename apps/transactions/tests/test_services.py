@@ -172,6 +172,7 @@ class ReturnBookServiceTest(TestCase):
         updated = return_book(borrow=borrow, return_date=return_date)
 
         self.assertEqual(updated.return_date, return_date)
+        self.assertEqual(updated.status, BorrowTransaction.Status.RETURNED)
         self.assertFalse(Fine.objects.filter(borrow_transaction=borrow).exists())
 
     def test_return_late_creates_overdue_fine(self):
@@ -192,7 +193,7 @@ class ReturnBookServiceTest(TestCase):
         self.assertEqual(fine.amount, expected_amount)
 
     def test_return_calculates_correct_fine_amount(self):
-        """Fine = DAILY_FINE_RATE × overdue_days."""
+        """Fine = FINE_PER_DAY_IDR × overdue_days."""
         borrow = make_borrow(self.member, self.copy, self.library, days_until_due=1)
         overdue_due = date.today() - timedelta(days=3)
         borrow.due_date = overdue_due
@@ -205,6 +206,7 @@ class ReturnBookServiceTest(TestCase):
     def test_raises_if_already_returned(self):
         borrow = make_borrow(self.member, self.copy, self.library)
         borrow.return_date = date.today() - timedelta(days=1)
+        borrow.status = BorrowTransaction.Status.RETURNED
         borrow.save()
 
         with self.assertRaises(ValueError) as ctx:

@@ -151,55 +151,6 @@ def expire_pending_borrows() -> int:
     return expired_count
 
 
-def return_book(*, borrow: BorrowTransaction, return_date: date) -> BorrowTransaction:
-    """
-    Mark a borrowed book as returned.
-    Transitions: ACTIVE → RETURNED.
-    Auto-creates an overdue fine if the book is returned late.
-
-    Raises ValueError if:
-    - Transaction is not ACTIVE (cannot return pending/failed/already returned).
-    - return_date is in the future.
-    """
-    if borrow.status != BorrowTransaction.Status.ACTIVE:
-        raise ValueError(
-            f"Cannot return a transaction with status '{borrow.status}'. "
-            "Only active transactions can be returned."
-        )
-
-    if return_date > date.today():
-        raise ValueError("return_date cannot be in the future.")
-
-    if return_date < borrow.borrow_date:
-        raise ValueError("return_date cannot be before the borrow_date.")
-
-    with transaction.atomic():
-        borrow.return_date = return_date
-        borrow.status = BorrowTransaction.Status.RETURNED
-        borrow.save(update_fields=["return_date", "status", "updated_at"])
-
-        # Auto-create overdue fine if returned late
-        if return_date > borrow.due_date:
-            overdue_days = (return_date - borrow.due_date).days
-            fine_amount = _calculate_overdue_fine(overdue_days)
-            Fine.objects.create(
-                borrow_transaction=borrow,
-                fine_type=Fine.FineType.OVERDUE,
-                amount=fine_amount,
-                description=f"Late return — {overdue_days} day(s) overdue.",
-            )
-            logger.info(
-                "fine.auto_created borrow_id=%s overdue_days=%s amount=%s",
-                borrow.pk, overdue_days, fine_amount,
-            )
-
-    logger.info(
-        "borrow.returned borrow_id=%s return_date=%s",
-        borrow.pk, return_date,
-    )
-    return borrow
-
-
 def update_borrow_status(*, borrow: BorrowTransaction, new_status: str) -> BorrowTransaction:
     """
     Manually override the status of a borrow transaction.
@@ -213,13 +164,3 @@ def update_borrow_status(*, borrow: BorrowTransaction, new_status: str) -> Borro
 
     logger.info("borrow.status_updated borrow_id=%s new_status=%s", borrow.pk, new_status)
     return borrow
-
-
-def _calculate_overdue_fine(overdue_days: int) -> int:
-    """
-    Calculate overdue fine amount in IDR.
-    Rate: Rp 1.000 per day (configurable via Django settings).
-    """
-    from django.conf import settings
-    rate = getattr(settings, "FINE_PER_DAY_IDR", 1000)
-    return overdue_days * rate
