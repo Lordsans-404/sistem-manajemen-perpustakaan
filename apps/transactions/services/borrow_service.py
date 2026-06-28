@@ -1,6 +1,7 @@
 import logging
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -25,6 +26,9 @@ def create_borrow_transaction(
 
     Business rules enforced here:
     - Member must be verified.
+    - Member must not have unpaid fines.
+    - Member must not exceed the active borrow limit (max 5 PENDING + ACTIVE).
+    - BookCopy condition must not be 'lost'.
     - BookCopy must not currently be pending or active (not available).
     - due_date must be strictly after borrow_date.
     """
@@ -47,6 +51,21 @@ def create_borrow_transaction(
     ).exists()
     if has_unpaid_fines:
         raise ValueError("Member has unpaid fines and cannot borrow new books until they are paid.")
+
+    # Check active borrow limit (configurable via BORROW_MAX_ACTIVE_BOOKS env var)
+    max_borrows = settings.BORROW_MAX_ACTIVE_BOOKS
+    active_borrow_count = BorrowTransaction.objects.filter(
+        member=member,
+        status__in=[
+            BorrowTransaction.Status.PENDING,
+            BorrowTransaction.Status.ACTIVE,
+        ],
+    ).count()
+    if active_borrow_count >= max_borrows:
+        raise ValueError(
+            f"Member has reached the maximum borrow limit of {max_borrows} books. "
+            "Return or resolve existing borrows before borrowing more."
+        )
 
     # Guard against double-borrowing — block if copy has pending or active transaction.
     # (failed/returned transactions are fine — book is available again)

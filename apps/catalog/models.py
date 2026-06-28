@@ -1,5 +1,6 @@
 import uuid
 
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 
 from apps.users.models import Library, TimestampMixin
@@ -14,8 +15,8 @@ class Book(TimestampMixin):
     """Bibliographic metadata for a book title."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=500, db_index=True)
-    author = models.CharField(max_length=255, db_index=True)
+    title = models.CharField(max_length=500)
+    author = models.CharField(max_length=255)
     category = models.CharField(max_length=100, db_index=True)
     cover_image = models.URLField(blank=True, null=True)
 
@@ -24,6 +25,24 @@ class Book(TimestampMixin):
         verbose_name = "Book"
         verbose_name_plural = "Books"
         ordering = ["title"]
+        indexes = [
+            # --- Book indexes ---
+            GinIndex(
+                fields=["title"],
+                name="book_title_trgm_idx",
+                opclasses=["gin_trgm_ops"],
+            ),
+            GinIndex(
+                fields=["author"],
+                name="book_author_trgm_idx",
+                opclasses=["gin_trgm_ops"],
+            ),
+            GinIndex(
+                fields=["category"],
+                name="book_category_trgm_idx",
+                opclasses=["gin_trgm_ops"],
+            ),
+        ]
 
     def __str__(self):
         return f"{self.title} — {self.author}"
@@ -64,7 +83,7 @@ class BookCopy(TimestampMixin):
         choices=Condition.choices,
         default=Condition.GOOD,
     )
-    isbn = models.CharField(max_length=20, null=True, blank=True)
+    isbn = models.CharField(max_length=20, null=True, blank=True, db_index=True)
     publisher = models.CharField(max_length=255, null=True, blank=True)
     publication_year = models.PositiveSmallIntegerField(null=True, blank=True)
 
@@ -72,6 +91,20 @@ class BookCopy(TimestampMixin):
         db_table = "book_copies"
         verbose_name = "Book Copy"
         verbose_name_plural = "Book Copies"
+        indexes = [
+            # isbn: B-tree for exact lookup + GIN trgm for partial search
+            GinIndex(
+                fields=["isbn"],
+                name="bookcopy_isbn_trgm_idx",
+                opclasses=["gin_trgm_ops"],
+            ),
+            # publisher: only trgm
+            GinIndex(
+                fields=["publisher"],
+                name="bookcopy_publisher_trgm_idx",
+                opclasses=["gin_trgm_ops"],
+            ),
+        ]
 
     def __str__(self):
         return f"{self.book.title} [copy {self.pk}] — {self.library.code}"

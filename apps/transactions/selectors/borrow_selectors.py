@@ -22,16 +22,18 @@ def get_borrow_by_id(borrow_id):
     )
 
 
-def get_all_borrows(status: str | None = None):
+def get_all_borrows(
+    status: str | None = None,
+    member_id=None,
+    member_name: str | None = None,
+):
     """
     Return all borrow transactions with related objects pre-fetched.
 
-    Pass status to filter by a specific status:
-      'pending'  → waiting for staff approval
-      'active'   → approved, book handed over
-      'returned' → book returned
-      'failed'   → expired or rejected
-    Pass None to return all statuses.
+    Filters (all optional, combinable):
+      status      — 'pending' | 'active' | 'returned' | 'failed'
+      member_id   — exact UUID match
+      member_name — case-insensitive partial match on member's user.name
     """
     qs = (
         BorrowTransaction.objects
@@ -42,6 +44,13 @@ def get_all_borrows(status: str | None = None):
 
     if status is not None:
         qs = qs.filter(status=status)
+
+    if member_id is not None:
+        qs = qs.filter(member_id=member_id)
+
+    if member_name:
+        # Uses GIN trigram index on User.name — fast icontains even on large datasets
+        qs = qs.filter(member__user__name__icontains=member_name)
 
     return qs
 

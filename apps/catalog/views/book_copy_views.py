@@ -10,6 +10,8 @@ from config.permissions import IsStaff
 
 from django.db.models import Exists, OuterRef
 
+from apps.transactions.models import BorrowTransaction
+
 from apps.catalog.selectors import (
     get_all_book_copies,
     get_available_copies,

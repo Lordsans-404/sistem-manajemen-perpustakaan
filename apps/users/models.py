@@ -1,6 +1,7 @@
 import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils import timezone
 
@@ -89,6 +90,10 @@ class User(TimestampMixin, AbstractBaseUser, PermissionsMixin):
         db_table = "users"
         verbose_name = "User"
         verbose_name_plural = "Users"
+        indexes = [
+            # Trigram index: enables fast LIKE '%name%' search (requires pg_trgm extension)
+            GinIndex(fields=["name"], name="user_name_trgm_idx", opclasses=["gin_trgm_ops"]),
+        ]
 
     def __str__(self):
         return f"{self.name} <{self.email}>"

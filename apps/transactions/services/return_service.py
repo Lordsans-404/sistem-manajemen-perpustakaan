@@ -68,7 +68,7 @@ def _create_overdue_fine(*, borrow: BorrowTransaction, return_date: date) -> Fin
         return None
 
     overdue_days = (return_date - borrow.due_date).days
-    rate = getattr(settings, "FINE_PER_DAY_IDR", 1000)
+    rate = settings.FINE_PER_DAY_IDR
     amount = Decimal(rate * overdue_days)
     try:
         with transaction.atomic():

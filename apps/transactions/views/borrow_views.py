@@ -50,12 +50,23 @@ class BorrowListView(APIView):
         status_param = request.query_params.get("status")
 
         if is_staff_user(request.user):
+            member_id_param = request.query_params.get("member_id") or None
+            member_name_param = request.query_params.get("member_name") or None
+
             if status_param == "overdue":
                 borrows = get_overdue_borrows()
-            elif status_param in ["pending", "active", "returned", "failed"]:
-                borrows = get_all_borrows(status=status_param)
+                # member filters still apply on top of overdue
+                if member_id_param:
+                    borrows = borrows.filter(member_id=member_id_param)
+                if member_name_param:
+                    borrows = borrows.filter(member__user__full_name__icontains=member_name_param)
             else:
-                borrows = get_all_borrows()
+                resolved_status = status_param if status_param in ["pending", "active", "returned", "failed"] else None
+                borrows = get_all_borrows(
+                    status=resolved_status,
+                    member_id=member_id_param,
+                    member_name=member_name_param,
+                )
         else:
             member = get_request_member(request.user)
             if member is None:

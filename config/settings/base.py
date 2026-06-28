@@ -149,3 +149,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardPagination",
     "PAGE_SIZE": 10,
 }
+
+# ---------------------------------------------------------------------------
+# Business Rules
+# ---------------------------------------------------------------------------
+
+# Maximum number of books a member can have borrowed (PENDING + ACTIVE) at once.
+# Override via env: BORROW_MAX_ACTIVE_BOOKS=10
+BORROW_MAX_ACTIVE_BOOKS = config("BORROW_MAX_ACTIVE_BOOKS", default=5, cast=int)
+
+# Overdue fine rate charged per day (in IDR).
+# Override via env: FINE_PER_DAY_IDR=2000
+FINE_PER_DAY_IDR = config("FINE_PER_DAY_IDR", default=1000, cast=int)
