@@ -90,3 +90,11 @@ def deactivate_user(*, user: User) -> User:
     user.save(update_fields=["is_active", "updated_at"])
     logger.info("user.deactivated user_id=%s", user.pk)
     return user
+
+
+def activate_user(*, user: User) -> User:
+    """Reactivate a user by setting is_active=True."""
+    user.is_active = True
+    user.save(update_fields=["is_active", "updated_at"])
+    logger.info("user.activated user_id=%s", user.pk)
+    return user

@@ -6,7 +6,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response 
+from config.permissions import IsStaff
 
+from apps.users.selectors import get_user_by_id
 from apps.users.serializers import ( 
     MemberProfileOutputSerializer,
     StaffProfileOutputSerializer,
@@ -14,7 +16,7 @@ from apps.users.serializers import (
     UserRegisterInputSerializer,
     UserUpdateInputSerializer,
 )
-from apps.users.services import create_user, update_user
+from apps.users.services import activate_user, create_user, deactivate_user, update_user
 
 logger = logging.getLogger(__name__)
 
@@ -109,4 +111,50 @@ class UserMeView(APIView):
         return success_response(
             data=self._build_profile_data(user),
             message="Profile updated successfully.",
+        )
+
+
+class UserDeactivateView(APIView):
+    """
+    PATCH /api/v1/users/{id}/deactivate/
+    Deactivate a user (staff only).
+    """
+
+    permission_classes = [IsStaff]
+
+    def patch(self, request, pk):
+        user = get_user_by_id(pk)
+        if not user:
+            return error_response(
+                message="User not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        user = deactivate_user(user=user)
+        return success_response(
+            data=UserOutputSerializer(user).data,
+            message="User deactivated successfully.",
+        )
+
+
+class UserActivateView(APIView):
+    """
+    PATCH /api/v1/users/{id}/activate/
+    Reactivate a user (staff only).
+    """
+
+    permission_classes = [IsStaff]
+
+    def patch(self, request, pk):
+        user = get_user_by_id(pk)
+        if not user:
+            return error_response(
+                message="User not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        user = activate_user(user=user)
+        return success_response(
+            data=UserOutputSerializer(user).data,
+            message="User activated successfully.",
         )

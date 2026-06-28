@@ -6,6 +6,7 @@ from rest_framework.serializers import CharField, EmailField, Serializer
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
+from apps.users.selectors import get_user_by_email
 from apps.users.services import login_with_supabase
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,14 @@ class LoginView(APIView):
             )
 
         data = serializer.validated_data
+        
+        user = get_user_by_email(data["email"])
+        if user and not user.is_active:
+            return error_response(
+                message="This account has been deactivated.",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
         try:
             tokens = login_with_supabase(
                 email=data["email"],

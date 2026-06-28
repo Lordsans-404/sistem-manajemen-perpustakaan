@@ -9,6 +9,8 @@ from apps.users.views import (
     MemberVerifyView,
     StaffDetailView,
     StaffListView,
+    UserActivateView,
+    UserDeactivateView,
     UserMeView,
     UserRegisterView,
 )
@@ -22,6 +24,8 @@ urlpatterns = [
     # --- User ---
     path("register/", UserRegisterView.as_view(), name="user-register"),
     path("me/", UserMeView.as_view(), name="user-me"),
+    path("<uuid:pk>/deactivate/", UserDeactivateView.as_view(), name="user-deactivate"),
+    path("<uuid:pk>/activate/", UserActivateView.as_view(), name="user-activate"),
 
     # --- Library ---
     path("libraries/", LibraryListView.as_view(), name="library-list"),
