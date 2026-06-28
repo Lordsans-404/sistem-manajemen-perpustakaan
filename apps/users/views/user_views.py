@@ -120,7 +120,7 @@ class UserDeactivateView(APIView):
     Deactivate a user (staff only).
     """
 
-    permission_classes = [IsStaff]
+    permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
         user = get_user_by_id(pk)
@@ -143,7 +143,7 @@ class UserActivateView(APIView):
     Reactivate a user (staff only).
     """
 
-    permission_classes = [IsStaff]
+    permission_classes = [IsAdmin]
 
     def patch(self, request, pk):
         user = get_user_by_id(pk)
