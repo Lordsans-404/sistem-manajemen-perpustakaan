@@ -2,6 +2,7 @@
 
 import django.contrib.postgres.indexes
 from django.db import migrations
+from django.contrib.postgres.operations import BtreeGinExtension, TrigramExtension
 
 
 class Migration(migrations.Migration):
@@ -12,6 +13,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        BtreeGinExtension(),
+        TrigramExtension(),
         migrations.AddIndex(
             model_name='user',
             index=django.contrib.postgres.indexes.GinIndex(fields=['name'], name='user_name_trgm_idx', opclasses=['gin_trgm_ops']),

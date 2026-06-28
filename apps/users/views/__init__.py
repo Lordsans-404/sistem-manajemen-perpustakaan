@@ -1,5 +1,10 @@
 from apps.users.views.auth_views import LoginView
-from apps.users.views.user_views import UserMeView, UserRegisterView
+from apps.users.views.user_views import (
+    UserActivateView,
+    UserDeactivateView,
+    UserMeView,
+    UserRegisterView,
+)
 from apps.users.views.library_views import LibraryDetailView, LibraryListView
 from apps.users.views.member_views import MemberDetailView, MemberListView, MemberVerifyView
 from apps.users.views.staff_views import StaffDetailView, StaffListView
@@ -8,6 +13,8 @@ __all__ = [
     # user
     "UserRegisterView",
     "UserMeView",
+    "UserActivateView",
+    "UserDeactivateView",
     # library
     "LibraryListView",
     "LibraryDetailView",
