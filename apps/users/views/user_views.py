@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response 
-from config.permissions import IsStaff
+from config.permissions import IsAdmin, IsStaff
 
 from apps.users.selectors import get_user_by_id
 from apps.users.serializers import ( 
@@ -117,7 +117,7 @@ class UserMeView(APIView):
 class UserDeactivateView(APIView):
     """
     PATCH /api/v1/users/{id}/deactivate/
-    Deactivate a user (staff only).
+    Deactivate a user (admin or supervisor only).
     """
 
     permission_classes = [IsAdmin]
@@ -140,7 +140,7 @@ class UserDeactivateView(APIView):
 class UserActivateView(APIView):
     """
     PATCH /api/v1/users/{id}/activate/
-    Reactivate a user (staff only).
+    Reactivate a user (admin or supervisor only).
     """
 
     permission_classes = [IsAdmin]
