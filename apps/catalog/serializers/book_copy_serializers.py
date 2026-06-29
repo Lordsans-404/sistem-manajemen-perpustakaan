@@ -29,6 +29,10 @@ class BookCopyInputSerializer(serializers.Serializer):
 class BookCopyUpdateInputSerializer(serializers.Serializer):
     """Validates data for a partial BookCopy update (PATCH)."""
 
+    library_id = serializers.UUIDField(
+        help_text="UUID of the Library to transfer this copy to.",
+        required=False,
+    )
     condition = serializers.ChoiceField(choices=BookCopy.Condition.choices, required=False)
     isbn = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
     publisher = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)

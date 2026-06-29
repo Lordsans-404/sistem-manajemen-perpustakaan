@@ -37,13 +37,18 @@ def create_book_copy(
 def update_book_copy(
     *,
     copy: BookCopy,
+    library: Library | None = None,
     condition: str | None = None,
     isbn: str | None = None,
     publisher: str | None = None,
     publication_year: int | None = None,
 ) -> BookCopy:
-    """Partially update a BookCopy's mutable fields."""
+    """Partially update a BookCopy's mutable fields, including optional library transfer."""
     updated_fields = []
+
+    if library is not None:
+        copy.library = library
+        updated_fields.append("library")
 
     if condition is not None:
         copy.condition = condition

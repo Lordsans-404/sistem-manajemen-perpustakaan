@@ -146,8 +146,19 @@ class BookCopyDetailView(APIView):
             )
 
         data = serializer.validated_data
+
+        library = None
+        if "library_id" in data:
+            library = get_library_by_id(data["library_id"])
+            if not library:
+                return error_response(
+                    message="Library not found.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
         copy = update_book_copy(
             copy=copy,
+            library=library,
             condition=data.get("condition"),
             isbn=data.get("isbn"),
             publisher=data.get("publisher"),
