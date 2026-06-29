@@ -15,6 +15,29 @@ def is_staff_user(user) -> bool:
         return False
 
 
+def is_admin_user(user) -> bool:
+    """
+    Return True if *user* is an admin or supervisor.
+    These roles have unrestricted access across all library branches.
+    Librarians are scoped to their assigned library.
+    """
+    try:
+        return user.staff_profile.role in {"admin", "supervisor"}
+    except ObjectDoesNotExist:
+        return False
+
+
+def get_staff_library(user):
+    """
+    Return the Library assigned to the staff user's profile, or None.
+    Used to enforce library-scoped access for non-admin staff.
+    """
+    try:
+        return user.staff_profile.library
+    except ObjectDoesNotExist:
+        return None
+
+
 def get_request_member(user):
     """
     Return the MemberProfile linked to *user*, or None if the user has no

@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
 from config.pagination import StandardPagination
-from config.permissions import IsAdmin, IsStaff, get_request_member, is_staff_user
+from config.permissions import IsAdmin, IsStaff, get_request_member, get_staff_library, is_admin_user, is_staff_user
 
 from apps.transactions.selectors import (
     get_all_fines,
@@ -40,8 +40,14 @@ class FineListView(APIView):
         payment_status = request.query_params.get("payment_status")
 
         if is_staff_user(request.user):
-            # Staff sees all fines, optionally filtered by payment_status.
-            fines = get_all_fines(payment_status=payment_status)
+            # Admin/supervisor sees all fines; librarian sees only their library's fines.
+            if is_admin_user(request.user):
+                fines = get_all_fines(payment_status=payment_status)
+            else:
+                staff_library = get_staff_library(request.user)
+                fines = get_all_fines(payment_status=payment_status).filter(
+                    borrow_transaction__library=staff_library
+                )
         else:
             # Member only sees fines tied to their own borrows.
             member = get_request_member(request.user)
@@ -76,6 +82,15 @@ class FineListView(APIView):
                 message="Borrow transaction not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        # Non-admin staff may only create fines for their assigned library.
+        if not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or borrow.library_id != staff_library.pk:
+                return error_response(
+                    message="You can only create fines for transactions in your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         try:
             fine = create_manual_fine(
@@ -138,6 +153,15 @@ class FinePayView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        # Non-admin staff may only pay fines for their assigned library.
+        if not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or fine.borrow_transaction.library_id != staff_library.pk:
+                return error_response(
+                    message="You can only manage fines for transactions in your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         # Only validate paid-specific fields
         data = {"payment_status": "paid", "paid_date": request.data.get("paid_date")}
         serializer = FinePaymentInputSerializer(data=data)
@@ -174,6 +198,15 @@ class FineWaiveView(APIView):
                 message="Fine not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        # Non-admin staff may only waive fines for their assigned library.
+        if not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or fine.borrow_transaction.library_id != staff_library.pk:
+                return error_response(
+                    message="You can only manage fines for transactions in your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         try:
             fine = waive_fine(fine=fine)

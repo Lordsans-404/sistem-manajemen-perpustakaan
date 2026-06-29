@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from config.api_response import error_response, success_response
 from config.pagination import StandardPagination
-from config.permissions import IsMember, IsMemberOrStaff, IsStaff, get_request_member, is_staff_user
+from config.permissions import IsMember, IsMemberOrStaff, IsStaff, get_request_member, get_staff_library, is_admin_user, is_staff_user
 
 from apps.catalog.selectors import get_book_copy_by_id
 from apps.transactions.selectors import (
@@ -67,6 +67,11 @@ class BorrowListView(APIView):
                     member_id=member_id_param,
                     member_name=member_name_param,
                 )
+
+            # Non-admin staff (librarian) may only see their own library's transactions.
+            if not is_admin_user(request.user):
+                staff_library = get_staff_library(request.user)
+                borrows = borrows.filter(library=staff_library)
         else:
             member = get_request_member(request.user)
             if member is None:
@@ -136,6 +141,15 @@ class BorrowListView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        # Non-admin staff may only create borrows for their assigned library.
+        if is_staff_user(request.user) and not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or library.pk != staff_library.pk:
+                return error_response(
+                    message="You can only create borrow transactions for your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         try:
             borrow = create_borrow_transaction(
                 member=member,
@@ -195,6 +209,15 @@ class BorrowDetailView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        # Non-admin staff may only manage their own library's transactions.
+        if not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or borrow.library_id != staff_library.pk:
+                return error_response(
+                    message="You can only manage borrow transactions for your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         new_status = request.data.get("status")
         if not new_status:
             return error_response(
@@ -230,6 +253,15 @@ class BorrowReturnView(APIView):
                 message="Borrow transaction not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        # Non-admin staff may only process returns for their own library.
+        if not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or borrow.library_id != staff_library.pk:
+                return error_response(
+                    message="You can only process returns for your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         serializer = BorrowTransactionReturnInputSerializer(data=request.data)
         if not serializer.is_valid():
@@ -276,6 +308,15 @@ class BorrowApproveView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        # Non-admin staff may only approve borrows for their own library.
+        if not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or borrow.library_id != staff_library.pk:
+                return error_response(
+                    message="You can only approve borrow requests for your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
         try:
             borrow = approve_borrow(borrow=borrow)
         except ValueError as exc:
@@ -303,6 +344,15 @@ class BorrowRejectView(APIView):
                 message="Borrow transaction not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        # Non-admin staff may only reject borrows for their own library.
+        if not is_admin_user(request.user):
+            staff_library = get_staff_library(request.user)
+            if staff_library is None or borrow.library_id != staff_library.pk:
+                return error_response(
+                    message="You can only reject borrow requests for your assigned library.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         try:
             borrow = reject_borrow(borrow=borrow)
