@@ -49,5 +49,5 @@ RUN SECRET_KEY=dummy \
     DJANGO_SETTINGS_MODULE=config.settings.production \
     python manage.py collectstatic --noinput
 
-# Jalankan migrate lalu Gunicorn (shell form agar $PORT ter-expand dengan benar)
-CMD python manage.py migrate --noinput && gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 8 --timeout 120 config.wsgi:application
+# Jalankan migrate (abaikan error) lalu paksa Gunicorn tetap jalan
+CMD python manage.py migrate --noinput; gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 8 --timeout 120 config.wsgi:application
