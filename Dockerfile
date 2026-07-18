@@ -4,11 +4,8 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
 
-# 1. Hugging Face mewajibkan port 7860
-ENV PORT=7860
-
-# 2. Hugging Face mewajibkan container berjalan sebagai non-root (user id 1000)
 RUN useradd -m -u 1000 user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH
