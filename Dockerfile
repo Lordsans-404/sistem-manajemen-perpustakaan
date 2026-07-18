@@ -4,27 +4,38 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8080
 
-# Buat direktori kerja
-WORKDIR /app
+# 1. Hugging Face mewajibkan port 7860
+ENV PORT=7860
 
-# Install system dependencies (jika dibutuhkan psycopg2, dll)
+# 2. Hugging Face mewajibkan container berjalan sebagai non-root (user id 1000)
+RUN useradd -m -u 1000 user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR $HOME/app
+
+# Install system dependencies (dengan root)
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Ganti ownership folder kerja ke user 1000
+RUN chown -R user:user $HOME/app
+
+# Pindah ke user 1000
+USER user
+
 # Install python dependencies
-COPY requirements.txt /app/
+COPY --chown=user requirements.txt $HOME/app/
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy seluruh source code
-COPY . /app/
+COPY --chown=user . $HOME/app/
 
 # Kumpulkan static files (agar bisa dilayani oleh WhiteNoise)
-# (Membutuhkan dummy SECRET_KEY agar tidak error saat build)
 RUN SECRET_KEY=dummy \
     SUPABASE_URL=dummy \
     SUPABASE_PROJECT_REF=dummy \
