@@ -8,18 +8,18 @@
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Django 5.2, Django REST Framework 3.16 |
-| Language | Python 3.11+ |
-| Database | PostgreSQL via **Supabase** (connection pooler, port 6543) |
-| Auth | Supabase Auth — JWT (ES256), validated server-side |
-| File Storage | Supabase Storage (book cover images) |
-| WSGI Server | Gunicorn |
-| Static Files | WhiteNoise (CompressedManifestStorage) |
-| Secrets / Config | python-decouple |
-| Container | Docker (Python 3.11-slim base) |
-| Deployment Target | Google Cloud Run |
+| Layer             | Technology                                                 |
+| -------------------| ------------------------------------------------------------|
+| Framework         | Django 5.2, Django REST Framework 3.16                     |
+| Language          | Python 3.11+                                               |
+| Database          | PostgreSQL via **Supabase** (connection pooler, port 6543) |
+| Auth              | Supabase Auth — JWT (ES256), validated server-side         |
+| File Storage      | Supabase Storage (book cover images)                       |
+| WSGI Server       | Gunicorn                                                   |
+| Static Files      | WhiteNoise (CompressedManifestStorage)                     |
+| Secrets / Config  | python-decouple                                            |
+| Container         | Docker (Python 3.11-slim base)                             |
+| Deployment Target | Google Cloud Run                                           |
 
 ---
 
@@ -337,15 +337,3 @@ See [`convention.md`](convention.md) for the full project convention (naming, ar
 - **Commits**: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`.
 - **No hardcoded values** — use environment variables.
 - **Test coverage target**: ≥ 80%, prioritising services → API → models.
-
----
-
-## License
-
-No LICENSE file is present in this repository. The legal terms are undeclared — treat as all rights reserved until a license is added.
-
----
-
-## Needs Clarification
-
-1. **Python version conflict in `convention.md`**: the file states "Python 3.13+" as the version target, but the `Dockerfile` uses `python:3.11-slim` and the README prerequisite says "Python 3.11+". The Dockerfile and runtime are the authoritative source — the convention doc appears to be stale.
