@@ -2,7 +2,7 @@
 
 > Version:
 >
-> - Python 3.13+
+> - Python 3.11+
 > - Django 5+
 > - Django REST Framework
 > - PostgreSQL
@@ -11,13 +11,13 @@
 
 # 1. Project Structure
 
-Gunakan **Feature-First Architecture**, bukan Layer-First.
+Use **Feature-First Architecture**, not Layer-First.
 
-# 2. Naming Convention
+# 2. Naming Conventions
 
-## Folder
+## Folders
 
-Gunakan:
+Use:
 
 ```txt
 snake_case
@@ -39,9 +39,9 @@ borrowTransaction/
 
 ---
 
-## Class
+## Classes
 
-Gunakan:
+Use:
 
 ```txt
 PascalCase
@@ -57,9 +57,9 @@ UserViewSet
 
 ---
 
-## Function
+## Functions
 
-Gunakan:
+Use:
 
 ```txt
 snake_case
@@ -80,9 +80,9 @@ BorrowBook()
 
 ---
 
-## Constant
+## Constants
 
-Gunakan:
+Use:
 
 ```txt
 UPPER_CASE
@@ -96,13 +96,13 @@ MAX_FINE_DAYS = 14
 
 ---
 
-# 3. Models Rules
+# 3. Model Rules
 
-Model bertanggung jawab hanya untuk:
+Models are responsible only for:
 
 - data
-- relasi
-- constraint
+- relations
+- constraints
 
 ## Allowed
 
@@ -117,7 +117,7 @@ def is_overdue():
 def process_payment():
 ```
 
-Business logic harus dipindahkan ke:
+Business logic must be moved to:
 
 ```txt
 services/
@@ -125,14 +125,14 @@ services/
 
 ---
 
-Semua model wajib memiliki:
+All models must include:
 
 ```py
 created_at
 updated_at
 ```
 
-Contoh:
+Example:
 
 ```py
 class TimestampMixin:
@@ -144,7 +144,7 @@ class TimestampMixin:
 
 # 4. Service Layer Rules
 
-Semua business logic masuk ke service.
+All business logic goes in the service layer.
 
 ## Forbidden
 
@@ -160,7 +160,7 @@ BorrowService.borrow()
 FineService.pay()
 ```
 
-Struktur:
+Structure:
 
 ```txt
 services/
@@ -174,7 +174,7 @@ pay_fine.py
 
 # 5. Selector Rules
 
-Selector hanya untuk query.
+Selectors are for queries only.
 
 ## Selector
 
@@ -191,7 +191,7 @@ get_user_by_email()
 
 ---
 
-Service:
+## Service:
 
 ✅ Write Data
 
@@ -199,7 +199,7 @@ Service:
 
 # 6. Serializer Rules
 
-Serializer hanya:
+Serializers are only for:
 
 - validate
 - transform
@@ -211,7 +211,7 @@ def create():
     send_email()
 ```
 
-Pisahkan:
+Separate into:
 
 ```txt
 BookInputSerializer
@@ -222,13 +222,13 @@ BookOutputSerializer
 
 # 7. API Convention
 
-Gunakan:
+Use:
 
 ```txt
 /api/v1/
 ```
 
-Contoh:
+Example:
 
 ```txt
 GET    /books
@@ -245,7 +245,7 @@ DELETE /books/{id}
 
 ## Rules
 
-### Gunakan plural
+### Use plural nouns
 
 Good:
 
@@ -261,7 +261,7 @@ Bad:
 
 ---
 
-Jangan gunakan:
+Do not use:
 
 ```txt
 /getBooks
@@ -310,7 +310,7 @@ Jangan gunakan:
 
 # 9. Validation Order
 
-Gunakan urutan:
+Use this order:
 
 ```txt
 Serializer
@@ -322,7 +322,7 @@ Service
 Database
 ```
 
-Jangan validasi di:
+Do not validate in:
 
 ```txt
 View
@@ -355,7 +355,7 @@ Django
 
 ---
 
-Permission:
+Permission classes:
 
 ```txt
 IsMember
@@ -363,20 +363,20 @@ IsStaff
 IsAdmin
 ```
 
-Jangan hardcode role.
+Do not hardcode role checks.
 
 ---
 
 # 11. Database Rules
 
-Gunakan:
+Use:
 
 - Foreign Key
 - Index
 - Unique
 - Constraint
 
-Contoh:
+Example:
 
 ```py
 email = models.EmailField(
@@ -387,7 +387,7 @@ email = models.EmailField(
 
 ---
 
-Migration:
+## Migrations
 
 Good:
 
@@ -405,7 +405,7 @@ Bad:
 
 # 12. Logging Rules
 
-Gunakan:
+Use:
 
 ```py
 logger.info()
@@ -415,13 +415,13 @@ logger.warning()
 logger.error()
 ```
 
-Jangan gunakan:
+Do not use:
 
 ```py
 print()
 ```
 
-Format log:
+Log format:
 
 ```txt
 timestamp
@@ -434,7 +434,7 @@ message
 
 # 13. Testing Rules
 
-Struktur:
+Structure:
 
 ```txt
 tests/
@@ -450,7 +450,7 @@ Target:
 Coverage ≥ 80%
 ```
 
-Prioritas:
+Priority:
 
 ```txt
 1. Service
@@ -462,7 +462,7 @@ Prioritas:
 
 # 14. Git Convention
 
-## Branch
+## Branches
 
 ```txt
 feature/borrow-books
@@ -474,7 +474,7 @@ refactor/book-service
 
 ---
 
-## Commit
+## Commits
 
 ```txt
 feat:
@@ -485,7 +485,7 @@ test:
 chore:
 ```
 
-Contoh:
+Example:
 
 ```txt
 feat: implement borrow transaction
@@ -495,13 +495,13 @@ feat: implement borrow transaction
 
 # 15. Documentation Rules
 
-Setiap app wajib memiliki:
+Every app must have:
 
 ```txt
 README.md
 ```
 
-Isi:
+Contents:
 
 ```md
 Purpose
@@ -519,23 +519,23 @@ Data Model
 
 ❌ Fat Views
 
-❌ Business Logic di Serializer
+❌ Business Logic in Serializer
 
 ❌ Circular Import
 
-❌ Raw SQL tanpa alasan
+❌ Raw SQL without justification
 
-❌ Hardcoded ENV
+❌ Hardcoded ENV values
 
-❌ Query dalam loop
+❌ Query in Loop
 
-❌ Direct database access dari frontend
+❌ Direct database access from frontend
 
 ---
 
 # 17. Performance Rules
 
-Gunakan:
+Use:
 
 ```py
 select_related()
@@ -543,9 +543,9 @@ select_related()
 prefetch_related()
 ```
 
-Untuk relasi.
+For relations.
 
-Gunakan:
+Use:
 
 ```py
 only()
@@ -553,19 +553,19 @@ only()
 defer()
 ```
 
-Untuk data besar.
+For large datasets.
 
 ---
 
 # 18. Security Rules
 
-Jangan commit:
+Do not commit:
 
 ```env
 SECRET_KEY
 ```
 
-Gunakan:
+Use:
 
 ```txt
 .env
@@ -577,7 +577,7 @@ Production:
 DEBUG=False
 ```
 
-Gunakan:
+Use:
 
 ```txt
 CORS
@@ -589,27 +589,27 @@ Rate Limit
 
 # 19. Code Review Checklist
 
-Sebelum merge:
+Before merging:
 
-- [ ] Test lulus
-- [ ] Tidak ada query N+1
-- [ ] Tidak ada hardcoded value
-- [ ] API konsisten
-- [ ] Dokumentasi diperbarui
-- [ ] Migration valid
-- [ ] Naming sesuai convention
-- [ ] Tidak ada dead code
+- [ ] Tests pass
+- [ ] No N+1 queries
+- [ ] No hardcoded values
+- [ ] API is consistent
+- [ ] Documentation is updated
+- [ ] Migrations are valid
+- [ ] Naming follows convention
+- [ ] No dead code
 
 ---
 
 # Final Principle
 
-> Model menyimpan data.
+> Models store data.
 >
-> Service menjalankan bisnis.
+> Services run business logic.
 >
-> Selector membaca data.
+> Selectors read data.
 >
-> Serializer memvalidasi data.
+> Serializers validate data.
 >
-> View mengatur HTTP.
+> Views handle HTTP.

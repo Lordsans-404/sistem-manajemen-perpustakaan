@@ -1,6 +1,6 @@
-# Setup Integrasi Django + Supabase
+# Django + Supabase Integration Setup
 
-Dokumentasi ini berdasarkan pengalaman setup langsung, termasuk troubleshooting yang ditemui.
+This guide covers the full setup process including troubleshooting. It was written from hands-on experience.
 
 ---
 
@@ -13,16 +13,16 @@ pip freeze > requirements.txt
 
 ---
 
-## 2. Konfigurasi .env
+## 2. Configure .env
 
 ```env
 # Django
 SECRET_KEY=your-secret-key
 DJANGO_SETTINGS_MODULE=config.settings.development
 
-# Database — gunakan Pooler, bukan Direct Connection
+# Database — use the connection pooler, not direct connection
 DB_NAME=postgres
-DB_USER=postgres.your-project-id      # ← PENTING: harus menyertakan project ID
+DB_USER=postgres.your-project-id      # IMPORTANT: must include project ID
 DB_PASSWORD=your-db-password
 DB_HOST=aws-0-ap-southeast-1.pooler.supabase.com
 DB_PORT=6543
@@ -33,9 +33,9 @@ SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-### Cara ambil nilai-nilai di atas dari Supabase Dashboard
+### Where to find these values in the Supabase Dashboard
 
-| Variable | Lokasi di Dashboard |
+| Variable | Location in Dashboard |
 |---|---|
 | `DB_*` | Settings → Database → **Connection pooling** |
 | `DB_USER` | Format: `postgres.[project-id]` |
@@ -43,11 +43,11 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 | `SUPABASE_ANON_KEY` | Settings → API → `anon public` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Settings → API → `service_role secret` |
 
-> **Penting:** `SERVICE_ROLE_KEY` jangan pernah diekspos ke frontend — hanya untuk server-side.
+> **Important:** Never expose `SERVICE_ROLE_KEY` to the frontend — only use it server-side.
 
 ---
 
-## 3. Konfigurasi Database di settings.py
+## 3. Database Configuration in settings.py
 
 ```python
 # config/settings/development.py
@@ -62,7 +62,7 @@ DATABASES = {
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT', default='6543'),
         'OPTIONS': {
-            'sslmode': 'require',  # Supabase wajib SSL, tidak perlu setting di dashboard
+            'sslmode': 'require',  # Supabase requires SSL; set in Django, not the dashboard
         },
     }
 }
@@ -72,7 +72,7 @@ DATABASES = {
 
 ## 4. Supabase Client
 
-Buat file `supabase_client.py` di root project:
+Create `supabase_client.py` in the project root:
 
 ```python
 from supabase import create_client, Client
@@ -80,22 +80,22 @@ from decouple import config
 
 supabase: Client = create_client(
     config('SUPABASE_URL'),
-    config('SUPABASE_ANON_KEY'),  # ganti SERVICE_ROLE_KEY untuk operasi server-side
+    config('SUPABASE_ANON_KEY'),  # use SERVICE_ROLE_KEY for server-side operations
 )
 ```
 
 ---
 
-## 5. Setup Logs (wajib sebelum jalankan apapun)
+## 5. Logs Setup (required before running anything)
 
-Kalau konfigurasi logging pakai `FileHandler`, folder `logs/` harus dibuat dulu secara manual — Django tidak otomatis membuatnya.
+If logging config uses `FileHandler`, the `logs/` directory must be created manually — Django does not create it automatically.
 
 ```bash
 mkdir logs
 touch logs/.gitkeep
 ```
 
-Atau biar otomatis, tambahkan ini di `base.py` sebelum blok `LOGGING`:
+Or, to create it automatically, add this to `base.py` before the `LOGGING` block:
 
 ```python
 import os
@@ -104,16 +104,16 @@ os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 ---
 
-## 6. Test Koneksi
+## 6. Connection Test
 
 ```bash
-# 1. Cek konfigurasi
+# 1. Check database configuration
 python manage.py check --database default
 
-# 2. Test koneksi langsung
+# 2. Open a database shell
 python manage.py dbshell
 
-# 3. Jalankan migrasi
+# 3. Run migrations
 python manage.py migrate
 
 # 4. Test Supabase client via Django shell
@@ -127,20 +127,24 @@ python manage.py shell
 ## 7. Troubleshooting
 
 ### `Network is unreachable` + `IPv4: (none)`
-Jaringan kamu tidak support IPv6, sementara direct connection Supabase hanya punya IPv6. Solusi: gunakan **pooler** (port 6543), bukan direct connection (port 5432).
+
+Your network does not support IPv6, but Supabase direct connections only provide IPv6. Solution: use the **connection pooler** (port 6543), not direct connection (port 5432).
 
 ### `FATAL: no tenant identifier provided`
-`DB_USER` masih pakai format `postgres` biasa. Untuk pooler harus pakai format `postgres.your-project-id`.
 
-### Cara cek apakah masalah jaringan atau konfigurasi
+`DB_USER` is still using plain `postgres`. For the pooler, the format must be `postgres.your-project-id`.
+
+### How to check if the issue is network or configuration
+
 ```bash
 curl -v telnet://aws-0-ap-southeast-1.pooler.supabase.com:6543
 ```
-Kalau konek → masalah di konfigurasi. Kalau timeout → masalah jaringan, pakai VPN.
+
+If it connects → the issue is in your configuration. If it times out → the issue is your network; use a VPN.
 
 ---
 
-## Catatan Penting
+## Important Notes
 
 **Direct Connection vs Pooler**
 
@@ -148,13 +152,15 @@ Kalau konek → masalah di konfigurasi. Kalau timeout → masalah jaringan, paka
 |---|---|---|
 | Port | 5432 | 6543 |
 | DB_USER | `postgres` | `postgres.project-id` |
-| IPv4 | ❌ (hanya IPv6) | ✅ |
-| Cocok untuk | - | Development & Production |
+| IPv4 | ❌ (IPv6 only) | ✅ |
+| Suitable for | — | Development & Production |
 
-Selalu gunakan **pooler** untuk menghindari masalah IPv6 dan lebih efisien untuk production.
+Always use the **pooler** to avoid IPv6 issues and for better production efficiency.
 
 **SSL**
-Supabase sudah enable SSL by default. Tidak perlu setting di dashboard, cukup tambahkan `'sslmode': 'require'` di `OPTIONS` Django.
+
+Supabase has SSL enabled by default. No dashboard configuration needed — just add `'sslmode': 'require'` in Django's `OPTIONS`.
 
 **Service Role Key**
-Gunakan `ANON_KEY` untuk operasi publik, `SERVICE_ROLE_KEY` hanya untuk operasi server-side yang butuh akses penuh (bypass RLS).
+
+Use `ANON_KEY` for public operations and `SERVICE_ROLE_KEY` only for server-side operations that need full access (bypass RLS).
